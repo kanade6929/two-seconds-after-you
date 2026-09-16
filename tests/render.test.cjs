@@ -70,3 +70,38 @@ test('particles are bounded and reduced-motion ripple avoids screen expansion',(
   const {r,stats}=renderer();for(let i=0;i<10;i++)r.burst({x:600,y:300},'#edbd88',60);assert.equal(r.particles.length,180);
   r.ripple({x:600,y:300},.2,true);assert.ok(Math.max(...stats.arcs)<100);
 });
+
+test('click reminder follows live permission, never afterglow or a paused scene',()=>{
+  const {driver}=require('./routes.cjs'),d=driver(0),g=d.g,{r}=renderer(),calls=[];
+  r.clickCue=(...args)=>calls.push(args);
+  r.game(g,'play',false);assert.equal(calls.length,0);
+  d.move(g.level.seal,3);d.until(()=>g.open,g.level.exit);
+  r.game(g,'play',false);assert.equal(calls.length,1);assert.equal(calls[0][1],'点击完成');
+  r.game(g,'pause',false);assert.equal(calls.length,1);
+  d.move(g.level.exit,2.2);assert.equal(g.view.clickable,false);
+  r.game(g,'play',false);assert.equal(calls.length,1);assert.ok(r.nodeLights.get('exit')>0);
+});
+
+test('click reminder breathes normally but stays static with reduced motion',()=>{
+  function capture(t,reduced){const {r,ctx}=renderer(),draw=[];
+    r.glow=(...args)=>draw.push(['glow',...args]);
+    r.polygon=(...args)=>draw.push(['frame',...args,ctx.globalAlpha]);
+    r.text=(...args)=>draw.push(['label',...args]);
+    r.clickCue({x:600,y:350},'点击完成',t,reduced);
+    // Glow ignores its time argument in reduced mode; compare displayed values.
+    draw[0][3]=0;return draw;
+  }
+  assert.notDeepEqual(capture(.25,false),capture(.75,false));
+  assert.deepEqual(capture(.25,true),capture(.75,true));
+  assert.equal(capture(.25,true).filter(v=>v[0]==='frame').length,1);
+  assert.equal(capture(.25,false).filter(v=>v[0]==='frame').length,2);
+});
+
+test('stage transition draws old and new scenes without a hard cut or active click cue',()=>{
+  const {driver}=require('./routes.cjs'),d=driver(0),g=d.g,{r,ctx}=renderer();d.until(()=>g.state.phase===1,g.level.seal);
+  const scenes=[],alphas=[];const scene=r.scene.bind(r);r.scene=(s,m,...args)=>{scenes.push([s.state.phase,m]);scene(s,m,...args);};
+  const blit=ctx.drawImage;ctx.drawImage=function(...a){alphas.push(this.globalAlpha);blit(...a);};
+  g.update(.09,g.point);r.game(g,'play',false,.09);assert.equal(scenes[0][0],0);assert.equal(scenes[0][1],'transition');assert.ok(alphas.at(-1)>.4&&alphas.at(-1)<.6);
+  g.update(.22,g.point);r.game(g,'play',false,.22);assert.equal(scenes.at(-1)[0],1);assert.ok(alphas.at(-1)>.4&&alphas.at(-1)<.6);
+  r.game(g,'paused',true,0);assert.equal(scenes.at(-1)[0],1);
+});

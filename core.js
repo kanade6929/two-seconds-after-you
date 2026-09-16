@@ -23,20 +23,20 @@
       }this.down=!!target.down;return {x:this.x,y:this.y,down:this.down};
     }
   }
-  function readProgress(raw={}){if(!raw||typeof raw!=='object')raw={};const max=LEVELS.length-1,completed=Array.isArray(raw.completed)?[...new Set(raw.completed.filter(n=>Number.isInteger(n)&&n>=0&&n<=max))]:[],unlocked=clamp(Math.max(0,...completed.map(n=>n+1),Number.isInteger(raw.unlocked)?raw.unlocked:0),0,max),current=clamp(Number.isInteger(raw.current)?raw.current:0,0,unlocked),checkpoints={};for(let i=0;i<LEVELS.length;i++){const c=raw.checkpoints?.[i];if(c&&Number.isInteger(c.phase)&&c.phase>=0&&c.phase<=LEVELS[i].phases)checkpoints[i]={phase:c.phase,energy:Number.isFinite(c.energy)?clamp(c.energy):.8};}return {completed,unlocked,current,started:raw.started===true||completed.length>0,checkpoints};}
+  function readProgress(raw={}){if(!raw||typeof raw!=='object')raw={};const max=LEVELS.length-1,completed=Array.isArray(raw.completed)?[...new Set(raw.completed.filter(n=>Number.isInteger(n)&&n>=0&&n<=max))]:[],unlocked=clamp(Math.max(0,...completed.map(n=>n+1),Number.isInteger(raw.unlocked)?raw.unlocked:0),0,max),current=clamp(Number.isInteger(raw.current)?raw.current:0,0,unlocked),checkpoints={};for(let i=0;i<LEVELS.length;i++){const c=raw.checkpoints?.[i];if(c&&Number.isInteger(c.phase)&&c.phase>=0&&c.phase<=8)checkpoints[i]={phase:Math.min(c.phase,LEVELS[i].phases-1),...(i===7?{turns:Rules.worldRestore(c.turns)}:{})};}return {completed,unlocked,current,started:raw.started===true||completed.length>0,checkpoints};}
   class Game{
-    constructor(index=0,checkpoint={}){this.index=index;this.level=LEVELS[index];this.state=Rules.create(index,checkpoint);this.point={...this.level.spawn,down:false};this.echo=null;this.t=0;this.timeline=new Timeline();this.timeline.add(0,this.point);this.timers={};this.hold=0;this.need=.4;this.sealHold=0;this.exitHold=0;this.open=false;this.won=false;this.ready=Rules.ready(this);this.revision=0;this.progressAt=0;this.effect={};this.blocked=false;this.view=Rules.view(this);}
+    constructor(index=0,checkpoint={}){this.index=index;this.level=LEVELS[index];this.state=Rules.create(index,checkpoint);this.point={...this.level.spawn,down:false};this.echo=null;this.t=0;this.timeline=new Timeline();this.timeline.add(0,this.point);this.timers={};this.contacts={};this.hold=0;this.need=.3;this.open=false;this.won=false;this.ready=false;this.winOrigin={...this.point};this.revision=0;this.progressAt=0;this.effect={};this.blocked=false;this.view=Rules.view(this);}
     update(dt,input,click=false){
-      if(this.won)return;this.t+=dt;this.blocked=false;let p={x:input.x,y:input.y,down:!!input.down};
-      const walls=!this.ready&&this.level.id==='sun'?Rules.sunLayout(this.state.phase).walls:[];let nearest=null;
+      if(this.won)return;
+      if(this.transition){this.transition.remaining=Math.max(0,this.transition.remaining-dt);if(this.transition.remaining<1e-8)this.transition=null;return;}
+      this.t+=dt;this.blocked=false;let p={x:input.x,y:input.y,down:!!input.down};
+      const walls=this.level.id==='sun'?Rules.sunLayout(this.state.phase).walls:[];let nearest=null;
       for(const [a,b]of walls){const hit=Rules.intersection(this.point,p,a,b);if(hit&&hit.t>1e-7&&(!nearest||hit.t<nearest.t))nearest=hit;}
       if(nearest){const dx=p.x-this.point.x,dy=p.y-this.point.y,n=Math.hypot(dx,dy)||1;p={x:nearest.x-dx/n*2,y:nearest.y-dy/n*2,down:p.down};this.blocked=true;}
       this.point=p;this.timeline.add(this.t,p);this.echo=this.timeline.at(this.t-DELAY);
-      const before=this.ready;Rules.update(this,dt,click);this.ready=Rules.ready(this);if(this.ready&&!before){this.sealHold=0;this.exitHold=0;this.effect={};}
-      this.sealHold=this.ready&&near(this.echo,this.level.seal)?this.sealHold+dt:0;this.open=this.ready&&this.sealHold>=HOLD-1e-8;
-      this.exitHold=this.open&&near(p,this.level.exit)?this.exitHold+dt:0;if(click&&this.open&&this.exitHold>=.25-1e-8)this.won=true;this.view=Rules.view(this);
+      Rules.update(this,dt,click);this.view=Rules.view(this);
     }
-    checkpoint(){return {phase:this.state.phase,energy:this.state.energy};}
+    checkpoint(){return {phase:this.state.phase,...(this.level.id==='world'?{turns:[...this.state.turns]}:{})};}
     status(){return this.view.message;}
   }
   const api={STEP,DELAY,HOLD,WIDTH,HEIGHT,MAX_SPEED,MAX_ACCEL,LEVELS,Rules,distance,segmentDistance,Timeline,Follower,Game,readProgress};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.EchoCore=api;

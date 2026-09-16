@@ -26,7 +26,7 @@
       const key=[game.index,game.state.phase,r.width,r.height,document.getElementById('gameBottom').hidden].join(':');if(this.layoutKey===key&&this.layoutGame===game)return;this.layoutKey=key;this.layoutGame=game;
       const landscape=r.width>r.height,heading=document.getElementById('gameHeading').getBoundingClientRect(),bottom=document.getElementById('gameBottom').getBoundingClientRect();
       const left=landscape?248:14,top=landscape?68:Math.max(190,heading.bottom+14),width=r.width-left-14,height=Math.max(100,(landscape?r.height-126:bottom.top-12)-top);
-      const points=[...game.view.nodes,game.point,...(game.echo?[game.echo]:[]),...(game.view.target?[{x:600,y:185}]:[])];const minX=Math.min(...points.map(p=>p.x))-90,maxX=Math.max(...points.map(p=>p.x))+90,minY=Math.min(...points.map(p=>p.y))-65,maxY=Math.max(...points.map(p=>p.y))+85;
+      const points=[...game.view.nodes,game.point,...(game.echo?[game.echo]:[]),...(game.view.targets?[{x:520,y:185},{x:650,y:185}]:[]),...(game.view.balance?[{x:318,y:260},{x:882,y:495}]:[])];const minX=Math.min(...points.map(p=>p.x))-90,maxX=Math.max(...points.map(p=>p.x))+90,minY=Math.min(...points.map(p=>p.y))-65,maxY=Math.max(...points.map(p=>p.y))+85;
       const spanX=Math.max(400,maxX-minX),spanY=Math.max(280,maxY-minY);this.scale=Math.min(width/spanX,height/spanY,1);this.ox=left+width/2-(minX+maxX)/2*this.scale;this.oy=top+height/2-(minY+maxY)/2*this.scale;
       this.sceneBounds={x:minX,y:minY,width:maxX-minX,height:maxY-minY};
     }
@@ -199,7 +199,20 @@
       this.glow(origin,C.red,age,true,Math.max(0,1-age));c.restore();
     }
     game(game,mode,reduced,dt=1/60) {
-      if(this.lastGame!==game){this.lastGame=game;this.nodeLights=new Map();this.particles=[];this.doorLight=0;this.beamLight=0;this.lastBeams=[];this.sunLights=[0,0];}
+      const transition=game.transition;
+      if(!transition){this.scene(game,mode,reduced,dt);return;}
+      const old=transition.remaining>.26,age=transition.duration-transition.remaining;
+      const opacity=old?Math.max(0,1-age/.18):Math.min(1,(.26-transition.remaining)/.26);
+      const display=old?transition.previous:game;
+      if(!this.sceneLayer)this.sceneLayer=typeof OffscreenCanvas==='function'?new OffscreenCanvas(this.canvas.width,this.canvas.height):document.createElement('canvas');
+      const layer=this.sceneLayer,canvas=this.canvas,ctx=this.ctx;
+      if(layer.width!==canvas.width)layer.width=canvas.width;if(layer.height!==canvas.height)layer.height=canvas.height;
+      this.canvas=layer;this.ctx=layer.getContext('2d');
+      try{this.scene(display,'transition',reduced,dt);}finally{this.canvas=canvas;this.ctx=ctx;}
+      this.base();this.atmosphere(this.visualTime,reduced);ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=opacity*opacity*(3-2*opacity);ctx.drawImage(layer,0,0);ctx.restore();
+    }
+    scene(game,mode,reduced,dt=1/60) {
+      if(this.lastGame!==game){this.lastGame=game;this.nodeLights=new Map();this.particles=[];this.doorLight=0;this.beamLight=0;this.lastBeams=[];this.sunLights=[0,0];this.worldAngles=new Map();this.balanceTilt=0;}
       this.visualTime+=dt;this.particles=this.particles.filter(p=>(p.age+=dt)<p.life);
       this.base();this.atmosphere(this.visualTime,reduced);
       const c=this.ctx,v=game.view,R=EchoCore.Rules,t=this.visualTime;
@@ -208,8 +221,14 @@
       for(const line of v.lines)this.path(line,C.line);
       if(v.world){
         const points=[...R.worldVertices,R.worldVertices[0]];this.path(points,C.line,1.2);
-        for(let i=0;i<32;i++){const a=R.worldPoint(i/8),b=R.worldPoint(i/8+.045);this.path([a,b],C.muted,.8);}
-        this.polygon(v.guide.x,v.guide.y,7,C.ink);
+        for(let i=0;i<4;i++)if(v.world.joined[i]&&v.world.joined[(i+1)%4])this.path([R.worldVertices[i],R.worldVertices[(i+1)%4]],C.ink,2);
+        this.sigil('世界',600,365,C.red,.25,1.35);
+        this.text(v.world.joined.filter(Boolean).length+' / 4 已接合',600,409,C.muted,11);
+      }
+      if(v.balance){const [left,right]=v.balance.torque,target=Math.max(-1,Math.min(1,(right-left)/6));this.balanceTilt=(this.balanceTilt||0)+(target-(this.balanceTilt||0))*(1-Math.exp(-dt*10));const tilt=this.balanceTilt*25;
+        this.path([{x:318,y:445-tilt},{x:882,y:445+tilt}],C.red,2);this.path([{x:583,y:478},{x:600,y:446},{x:617,y:478},{x:583,y:478}],C.muted,1.5);
+        this.text('今 · 重 '+v.balance.masses[0],480,260,C.ink,14);this.text('昔 · 重 '+v.balance.masses[1],720,260,C.red,14);
+        this.text('左力 '+left,450,495,C.muted,12);this.text('右力 '+right,750,495,C.muted,12);
       }
       this.beamLight=approach(this.beamLight,v.beams?.length?1:0,v.beams?.length?.14:.18);
       if(v.beams?.length)this.lastBeams=v.beams;
@@ -224,32 +243,39 @@
         for(let i=0;i<2;i++){const active=i===0?game.effect.left:game.effect.right;this.sunLights[i]=approach(this.sunLights[i],active?1:0,active?.14:.18);this.polygon(v.sun.receivers[i].x,v.sun.receivers[i].y,8,this.mix(C.line,i?C.ink:C.red,this.sunLights[i]),true);}
       }
       for(const star of v.stars)this.sigil('星星',star.x,star.y,C.red,0,.55);
-      if(v.target){this.sigil(v.target,600,185,C.red,.3,.65);this.text('寻找此纹',650,190,C.muted,11,'left');}
+      if(v.targets){v.targets.forEach((target,i)=>{this.sigil(target,545+i*85,185,i===v.targetIndex?C.ink:C.red,i===v.targetIndex?.8:.15,.65);this.text(i<v.targetIndex?'已回应':i===v.targetIndex?'现在回应':'随后回应',545+i*85,216,C.muted,10);});this.path([{x:574,y:185},{x:601,y:185},{x:595,y:181}],C.line);}
       for(let i=0;i<v.nodes.length;i++){
-        const n=v.nodes[i],now=R.near(game.point,n)&&n.role!=='echo',echo=R.near(game.echo,n)&&n.role!=='now';
-        let active=now||echo;if(n.id==='seal')active=game.open;if(n.exit)active=game.open;
-        if(n.id==='receiver')active=game.hold>0;
+        const n=v.nodes[i],echo=n.role==='echo'||n.role!=='now'&&R.nodeContains(game.echo,n,R.RELEASE_RADIUS);
+        const active=!!n.active;
         const old=this.nodeLights.get(n.id)||0,light=approach(old,active?1:0,active?.14:n.exit?.16:.18);this.nodeLights.set(n.id,light);
         if(old<.05&&light>.05&&!reduced)this.burst(n,echo?C.red:C.ink,10);
         const hue=n.role==='echo'||echo?C.red:C.ink,col=this.mix('#677e90',hue,light);
         this.glow(n,hue,t,reduced,light*.13);
-        this.polygon(n.x,n.y,n.exit?44:39,this.mix('#101c2a','#192b35',light),true,8,Math.PI/8);
-        this.polygon(n.x,n.y,n.exit?44:39,col,false,8,Math.PI/8);
+        this.polygon(n.x,n.y,n.radius,this.mix('#101c2a','#192b35',light),true,8,Math.PI/8);
+        this.polygon(n.x,n.y,n.radius,col,false,8,Math.PI/8);
+        this.polygon(n.x,n.y,n.releaseRadius,this.mix(C.line,col,.25+light*.4),false,8,Math.PI/8);
         if(n.mirror!==undefined){const ends=n.mirror===0?[[-18,0],[18,0]]:n.mirror===1?[[-15,15],[15,-15]]:[[-15,-15],[15,15]];this.path(ends.map(([x,y])=>({x:n.x+x,y:n.y+y})),col,2);}
+        else if(n.turn!==undefined){const i=v.nodes.indexOf(n),oldTurn=this.worldAngles.get(i)??n.turn,delta=((n.turn-oldTurn+6)%4)-2,turn=reduced?n.turn:oldTurn+delta*(1-Math.exp(-dt*22));this.worldAngles.set(i,turn);const ports=R.worldPorts(i,turn);this.path([ports[0],n,ports[1]],v.world.joined[i]?C.ink:col,2.2);this.polygon(n.x,n.y,4,col);}
         else this.sigil(n.sigil,n.x,n.y,col,light,.72);
         this.orbitParticles(n,light,t,reduced,hue);
         const labelColor=this.mix(C.muted,hue,light);
-        if(game.level.id==='star'&&!game.ready)this.text(this.mobile?n.label[0]:n.label,n.x+(n.role==='echo'?-48:48),n.y+4,labelColor,12,n.role==='echo'?'right':'left');
+        if(game.level.id==='star')this.text(this.mobile?n.label[0]:n.label,n.x+(n.x<600?-52:52),n.y+4,labelColor,12,n.x<600?'right':'left');
         else this.text(n.label,n.x,n.y+59,labelColor,12);
-        const amount=n.id==='seal'?game.sealHold/.4:n.exit?game.exitHold/.25:n.id==='source'?(game.timers.source||0)/.4:n.id==='well'?(game.timers.well||0)/.4:n.id==='learn'?(game.timers.learn||0)/.4:active?v.progress:0;
+        const amount=n.amount??(active?v.progress:0);
         if(amount>0){this.path([{x:n.x-20,y:n.y+45},{x:n.x+20,y:n.y+45}],C.line,2);this.path([{x:n.x-20,y:n.y+45},{x:n.x-20+40*Math.min(1,amount),y:n.y+45}],hue,2);}
-        if(v.energy){const energy=v.energy[i];this.text(Math.round(energy*100)+'%',n.x,n.y+80,energy>=.45&&energy<=.55?C.ink:C.red,12);this.path([{x:n.x-27,y:n.y+90},{x:n.x+27,y:n.y+90}],C.line,3);this.path([{x:n.x-27,y:n.y+90},{x:n.x-27+54*energy,y:n.y+90}],C.red,3);}
       }
-      if(game.ready){this.text(game.open?'门印有光':'影子守印 0.4 秒',game.level.seal.x,game.level.seal.y-64,C.muted,11);this.text(game.exitHold>=.25?'可以点击':'停稳 0.25 秒',game.level.exit.x,game.level.exit.y-64,C.muted,11);}
-      const progress=game.ready?Math.min(1,game.exitHold/.25):v.progress;
-      if(!this.mobile){this.path([{x:515,y:542},{x:685,y:542}],C.line,2);if(progress>0)this.path([{x:515,y:542},{x:515+170*progress,y:542}],C.red,2);}
+      if(v.clickable&&v.actionPoint&&mode==='play')this.clickCue(v.actionPoint,v.actionLabel,t,reduced,game.level.id==='star');
+      const progress=v.progress;
+      if(!this.mobile&&!v.world){this.path([{x:515,y:542},{x:685,y:542}],C.line,2);if(progress>0)this.path([{x:515,y:542},{x:515+170*progress,y:542}],C.red,2);}
       c.save();c.globalAlpha=mode==='celebrate'?.4:1;this.cursors(null,game.echo,game.timeline,reduced,game.t);c.restore();
       this.drawParticles(reduced);
+    }
+    clickCue(p,label,t,reduced,side=false){
+      const c=this.ctx,pulse=reduced?1:(1+Math.sin(t*Math.PI*2))*.5,color=this.mix(C.ink,C.red,pulse);
+      c.save();this.glow(p,color,t,reduced,.18+.12*pulse);
+      c.globalAlpha=reduced?1:.6+.4*pulse;this.polygon(p.x,p.y,49,color,false,8,Math.PI/8);
+      if(!reduced){const age=t%1;c.globalAlpha=(1-age)*.45;this.polygon(p.x,p.y,50+age*14,C.red,false,8,Math.PI/8);}
+      c.globalAlpha=1;this.text(label,side?p.x+(p.x<600?-52:52):p.x,side?p.y-19:p.y-65,C.ink,side?11:13,side?(p.x<600?'right':'left'):'center');c.restore();
     }
   }
   window.EchoRenderer=Renderer;

@@ -53,7 +53,7 @@
   function home(){checkpoint();titleTimeline=new Timeline();titleTime=0;show('title');controls();}
   function retry(){if(game)enter(game.index,game.checkpoint());}
   function updateStatus(){
-    $('status').textContent=game.status();$('phaseLabel').textContent=game.ready?'最后的交接':`第 ${game.state.phase+1} 阵 / ${game.level.phases}`;
+    $('status').textContent=game.view.clickable?game.view.actionLabel+' · 两光仍需保持合作。':game.status();$('phaseLabel').textContent=`第 ${game.state.phase+1} 阵 / ${game.level.phases}`;
     visible('hintButton',game.t-game.progressAt>=25);
   }
   function win(){
@@ -66,6 +66,7 @@
     if(game.won)win();
   }
   function step(){
+    if(mode==='play'&&game.transition){game.update(STEP,game.point);follower.reset(game.point);down=false;return;}
     if(touchMode&&mode==='play'&&renderer.sceneBounds){const b=renderer.sceneBounds;raw.x=Math.max(b.x+8,Math.min(b.x+b.width-8,raw.x));raw.y=Math.max(b.y+8,Math.min(b.y+b.height-8,raw.y));}
     const p=follower.update(STEP,{...raw,down});
     if(mode==='resuming'){
@@ -86,9 +87,9 @@
   }
   function frame(now){
     const elapsed=Math.min(.1,Math.max(0,(now-last)/1000));last=now;
-    if(!document.hidden){renderer.layout(game&&!['title','menu','community','ending'].includes(mode)?game:null,touchMode);accumulator+=elapsed;while(accumulator>=STEP){step();accumulator-=STEP;}
+    if(!document.hidden){const scene=game?.transition?.remaining>.26?game.transition.previous:game;renderer.layout(scene&&!['title','menu','community','ending'].includes(mode)?scene:null,touchMode);accumulator+=elapsed;while(accumulator>=STEP){step();accumulator-=STEP;}
       if(['title','menu','community','ending'].includes(mode))renderer.title(null,titleTimeline.at(titleTime-2),titleTimeline,titleTime,reduced);
-      else if(game){renderer.game(game,mode,reduced,['paused','resuming'].includes(mode)?0:elapsed);if(mode==='play')updateStatus();if(mode==='celebrate'){celebration+=elapsed;renderer.ripple(game.level.exit,celebration,reduced);if(celebration>=(reduced?.4:1.1))show('complete');}}
+      else if(game){renderer.game(game,mode,reduced,['paused','resuming'].includes(mode)?0:elapsed);if(mode==='play')updateStatus();if(mode==='celebrate'){celebration+=elapsed;renderer.ripple(game.winOrigin,celebration,reduced);if(celebration>=(reduced?.4:1.1))show('complete');}}
       updateCursor();
     }requestAnimationFrame(frame);
   }
@@ -125,7 +126,7 @@
   $('start').onclick=()=>enter(0);$('continueGame').onclick=()=>{if(progress.started)enter(progress.current,progress.checkpoints[progress.current]||{});};$('retry').onclick=$('pauseRetry').onclick=retry;$('pause').onclick=pause;$('resume').onclick=resume;
   $('home').onclick=$('pauseHome').onclick=$('endingHome').onclick=home;
   $('sound').onclick=()=>{muted=!muted;controls();persist();unlockAudio();tone();};$('motion').onclick=()=>{reduced=!reduced;controls();persist();};
-  $('hintButton').onclick=()=>{hintTier=0;showHint();};function showHint(){$('hintText').textContent=game.ready?'先在门印停约 1 秒，再走向出口。暖金守印 0.4 秒、青色在门前停稳 0.25 秒后点击。':game.level.hint[hintTier];$('hintNext').disabled=hintTier===1||game.ready;visible('hint',true);}
+  $('hintButton').onclick=()=>{hintTier=0;showHint();};function showHint(){$('hintText').textContent=game.level.hint[hintTier];$('hintNext').disabled=hintTier===1;visible('hint',true);}
   $('hintNext').onclick=()=>{hintTier=1;showHint();};$('closeHint').onclick=()=>visible('hint',false);
   $('next').onclick=()=>{if(game.index<7)enter(game.index+1);else{$('collected').replaceChildren(...LEVELS.map(l=>ArcanaSymbols.svg(l.title,document)));show('ending');tone(261.63,1.4);}};$('again').onclick=()=>enter(0);
   function closeMenu(){show(returnMode==='play'||returnMode==='resuming'?'paused':returnMode);}
