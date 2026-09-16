@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const Core=require('../core.js');
-function renderer(width=1920,height=1080,trace=false){
+function renderer(width=1920,height=1080,trace=false,dpr=1){
   const stats={strokes:0,paths:0,arcs:[],beziers:0,blits:0,layers:0,gradients:[],composites:new Set()};
   function context(){
     const stack=[];
@@ -15,7 +15,7 @@ function renderer(width=1920,height=1080,trace=false){
     return ctx;
   }
   const ctx=context();
-  const sandbox={EchoCore:Core,ArcanaSymbols:require('../symbols.js'),window:{devicePixelRatio:1},OffscreenCanvas:class{constructor(width,height){this.width=width;this.height=height;this.ctx=context();stats.layers++;}getContext(){return this.ctx;}}};
+  const sandbox={EchoCore:Core,ArcanaSymbols:require('../symbols.js'),window:{devicePixelRatio:dpr},OffscreenCanvas:class{constructor(width,height){this.width=width;this.height=height;this.ctx=context();stats.layers++;}getContext(){return this.ctx;}}};
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../render.js'),'utf8'),sandbox);
   const r=new sandbox.window.EchoRenderer({getContext:()=>ctx,getBoundingClientRect:()=>({left:0,top:0,width,height})});return {r,stats,ctx};
 }
@@ -38,7 +38,7 @@ test('resting input never stamps dots and trail compositing preserves parent fad
 test('tarot sigils consist only of straight line paths, never circles or bezier curves',()=>{
   for(const name of ['星星','月亮','太阳']){
     const {r,stats}=renderer();r.sigil(name,600,325,'#edbd88',1);
-    assert.ok(stats.paths>=2);assert.equal(stats.beziers,0);assert.equal(stats.arcs.length,0);
+    assert.equal(stats.paths,1);assert.equal(stats.strokes,1);assert.equal(stats.beziers,0);assert.equal(stats.arcs.length,0);
   }
 });
 test('visible trails decay sooner without changing the two-second replay offset',()=>{
@@ -104,4 +104,18 @@ test('stage transition draws old and new scenes without a hard cut or active cli
   g.update(.09,g.point);r.game(g,'play',false,.09);assert.equal(scenes[0][0],0);assert.equal(scenes[0][1],'transition');assert.ok(alphas.at(-1)>.4&&alphas.at(-1)<.6);
   g.update(.22,g.point);r.game(g,'play',false,.22);assert.equal(scenes.at(-1)[0],1);assert.ok(alphas.at(-1)>.4&&alphas.at(-1)<.6);
   r.game(g,'paused',true,0);assert.equal(scenes.at(-1)[0],1);
+});
+
+test('background and glow reuse bounded sprites; ribbon buffers are local, not full screen',()=>{
+ const {r,stats}=renderer();r.base();const sky=r.skyLayer;r.base();assert.equal(r.skyLayer,sky);
+ for(let i=0;i<20;i++)r.glow({x:600,y:300},'#b8eee8',i,false);assert.equal(r.glowSprites.size,1);
+ const t=new Core.Timeline();t.add(0,{x:500,y:300});t.add(1,{x:520,y:310});r.ribbon(t,0,1,'#b8eee8',.6);
+ assert.ok(r.ribbonLayer.width<500&&r.ribbonLayer.height<500);const before=stats.strokes;r.sigil('太阳',600,300,'#b8eee8');assert.equal(stats.strokes-before,1);
+});
+
+test('mobile pixel adaptation requires sustained pressure and never moves logical coordinates',()=>{
+ const {r}=renderer(390,844,false,3);r.mobile=true;r.scale=.6;r.ox=20;r.oy=100;
+ for(let i=0;i<40;i++)r.adapt(33,12,true);assert.equal(r.dpr,2);
+ for(let i=0;i<30;i++)r.adapt(33,12,true);assert.equal(r.dpr,1.75);assert.equal(r.scale,.6);assert.equal(r.ox,20);assert.equal(r.oy,100);
+ r.adapt(1000,50,true);assert.equal(r.pressure,0);
 });

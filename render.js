@@ -3,13 +3,16 @@
   const { WIDTH: W, HEIGHT: H, HOLD } = EchoCore;
   const C = { paper: '#090f19', ink: '#b8eee8', muted: '#91a6b9', line: '#2b3b50', red: '#edbd88', soft: '#152538' };
   class Renderer {
-    constructor(canvas) { this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.lights=[]; this.doorLight=0; this.visualTime=0; this.particles=[]; this.lastGame=null; this.resize(); }
+    constructor(canvas) { this.canvas = canvas; this.ctx = canvas.getContext('2d',{alpha:false}); this.lights=[]; this.doorLight=0; this.visualTime=0; this.particles=[]; this.lastGame=null; this.resize(); }
+    layer(width,height){const c=typeof OffscreenCanvas==='function'?new OffscreenCanvas(width,height):document.createElement('canvas');c.width=width;c.height=height;return c;}
     resize() {
-      const r = this.canvas.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const r = this.canvas.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, this.mobileDpr||2);
       this.canvas.width = Math.round(r.width * dpr); this.canvas.height = Math.round(r.height * dpr);
       this.scale = Math.min(r.width / W, r.height / H);
       this.ox = (r.width - W * this.scale) / 2; this.oy = (r.height - H * this.scale) / 2;
       this.dpr = dpr;
+      this.rect=r;this.skyLayer=null;this.glowSprites=new Map();
+      this.ribbonLayer=null;this.ribbonMask=null;this.sceneLayer=null;
       // Match the CSS night sky inside the canvas as well: screen-composited
       // light maps need an opaque backdrop or their black bounds show through.
       const c = this.ctx, w = this.canvas.width, h = this.canvas.height;
@@ -19,9 +22,17 @@
       this.sky.addColorStop(0, '#152839'); this.sky.addColorStop(.42, '#0b1522'); this.sky.addColorStop(1, '#070c14');
       c.setTransform(1, 0, 0, 1, 0, 0);
     }
-    point(e) { const r = this.canvas.getBoundingClientRect(); return { x: (e.clientX - r.left - this.ox) / this.scale, y: (e.clientY - r.top - this.oy) / this.scale, down: e.buttons === 1 }; }
+    adapt(frameMs,costMs,active){
+      if(!this.mobile||!active||frameMs>150){this.pressure=0;return;}
+      // Hysteresis: lower only the raster scale after sustained pressure.
+      // HTML text, pointer coordinates, 120 Hz physics and replay never change.
+      const slow=frameMs>24||costMs>11;this.pressure=Math.max(0,(this.pressure||0)+(slow?frameMs:-frameMs*2));
+      if(this.pressure<2200||this.dpr<=1.25)return;
+      this.pressure=0;const scale=this.scale,x=this.ox,y=this.oy;this.mobileDpr=Math.max(1.25,this.dpr-.25);this.resize();this.scale=scale;this.ox=x;this.oy=y;
+    }
+    point(e) { const r = this.rect; return { x: (e.clientX - r.left - this.ox) / this.scale, y: (e.clientY - r.top - this.oy) / this.scale, down: e.buttons === 1 }; }
     layout(game,mobile){
-      this.mobile=mobile;const r=this.canvas.getBoundingClientRect();
+      this.mobile=mobile;const r=this.rect;
       if(!mobile||!game){this.scale=Math.min(r.width/W,r.height/H);this.ox=(r.width-W*this.scale)/2;this.oy=(r.height-H*this.scale)/2;this.sceneBounds=null;this.layoutKey='';return;}
       const key=[game.index,game.state.phase,r.width,r.height,document.getElementById('gameBottom').hidden].join(':');if(this.layoutKey===key&&this.layoutGame===game)return;this.layoutKey=key;this.layoutGame=game;
       const landscape=r.width>r.height,heading=document.getElementById('gameHeading').getBoundingClientRect(),bottom=document.getElementById('gameBottom').getBoundingClientRect();
@@ -42,7 +53,9 @@
     }
     sigil(name, x, y, color, intensity=0, size=1) {
       const c=this.ctx;c.save();c.lineCap='butt';c.lineJoin='miter';c.shadowColor=color;c.shadowBlur=intensity*8*this.scale;
-      for(const points of ArcanaSymbols.paths(name))this.path(points.map(([dx,dy])=>({x:x+dx*size,y:y+dy*size})),color,1.3);
+      // One glyph, one raster/shadow pass, rather than a blur per short stroke.
+      c.beginPath();for(const points of ArcanaSymbols.paths(name))points.forEach(([dx,dy],i)=>i?c.lineTo(x+dx*size,y+dy*size):c.moveTo(x+dx*size,y+dy*size));
+      c.strokeStyle=color;c.lineWidth=1.3;c.stroke();
       c.restore();
     }
     polygon(x,y,r,color,fill=false,sides=4,angle=-Math.PI/2) {
@@ -54,8 +67,8 @@
       const c = this.ctx; c.setTransform(1, 0, 0, 1, 0, 0);
       c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.shadowBlur = 0;
       const w = this.canvas.width, h = this.canvas.height;
-      c.setTransform(this.skyRx, 0, 0, this.skyRy, w * .72, h * .48);
-      c.fillStyle = this.sky; c.fillRect(-w * .72 / this.skyRx, -h * .48 / this.skyRy, w / this.skyRx, h / this.skyRy);
+      if(!this.skyLayer){this.skyLayer=this.layer(w,h);const sky=this.skyLayer.getContext('2d',{alpha:false});sky.setTransform(this.skyRx,0,0,this.skyRy,w*.72,h*.48);sky.fillStyle=this.sky;sky.fillRect(-w*.72/this.skyRx,-h*.48/this.skyRy,w/this.skyRx,h/this.skyRy);}
+      c.drawImage(this.skyLayer,0,0);
       c.setTransform(this.dpr * this.scale, 0, 0, this.dpr * this.scale, this.dpr * this.ox, this.dpr * this.oy);
     }
     atmosphere(t, reduced) {
@@ -68,11 +81,13 @@
       c.globalAlpha = 1;
     }
     glow(p, color, t, reduced, alpha = 1, hollow = false) {
+      if(alpha<.001)return;
       const c = this.ctx, breath = reduced ? 1 : 1 + .10 * Math.sin(t * 1.45 + (hollow ? 1.4 : 0));
       c.save(); c.globalAlpha *= Math.max(0, Math.min(1, alpha));
-      const radius = 53 * breath, gradient = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
-      gradient.addColorStop(0, color + '50'); gradient.addColorStop(.28, color + '19'); gradient.addColorStop(1, color + '00');
-      this.circle(p.x, p.y, radius, gradient, true);
+      const radius = 53 * breath;
+      let sprite=this.glowSprites.get(color);
+      if(!sprite){sprite=this.layer(128,128);const s=sprite.getContext('2d'),gradient=s.createRadialGradient(64,64,0,64,64,64);gradient.addColorStop(0,color+'50');gradient.addColorStop(.28,color+'19');gradient.addColorStop(1,color+'00');s.fillStyle=gradient;s.fillRect(0,0,128,128);if(this.glowSprites.size>=64)this.glowSprites.delete(this.glowSprites.keys().next().value);this.glowSprites.set(color,sprite);}
+      c.drawImage(sprite,p.x-radius,p.y-radius,radius*2,radius*2);
       c.shadowColor = color; c.shadowBlur = 17 * this.scale;
       if (hollow) { this.circle(p.x, p.y, p.down ? 8 : 6, color, false, 1.8); this.circle(p.x, p.y, 2, '#fff2dd', true); }
       else { this.circle(p.x, p.y, p.down ? 6 : 4.5, color, true); this.circle(p.x, p.y, 2, '#f1fffc', true); }
@@ -80,7 +95,7 @@
     }
     ribbon(timeline, start, end, color, opacity) {
       if (!timeline || end <= start) return;
-      const points = [], cadence = 1 / 45;
+      const points = [], cadence = 1 / (this.mobile?30:45);
       const first = timeline.at(start); if (first) points.push(first);
       // Keep every time-grid sample: distance decimation from the moving tail
       // changes ALL retained vertices at once, making slow curves shimmer.
@@ -100,19 +115,19 @@
       // An opaque, reusable light map lets 'lighten' take the maximum intensity
       // at joins/self-crossings instead of accumulating translucent round caps.
       // Black is neutral when this map is screened onto the actual night scene.
-      const createLayer = () => typeof OffscreenCanvas === 'function'
-        ? new OffscreenCanvas(this.canvas.width, this.canvas.height) : document.createElement('canvas');
+      const width=right-left,height=bottom-top;
+      const createLayer = () => this.layer(Math.ceil(width/128)*128,Math.ceil(height/128)*128);
       if (!this.ribbonLayer) this.ribbonLayer = createLayer();
       if (!this.ribbonMask) this.ribbonMask = createLayer();
       const layer = this.ribbonLayer;
       for (const surface of [layer, this.ribbonMask]) {
-        if (surface.width !== this.canvas.width) surface.width = this.canvas.width;
-        if (surface.height !== this.canvas.height) surface.height = this.canvas.height;
+        if (surface.width < width) surface.width = Math.ceil(width/128)*128;
+        if (surface.height < height) surface.height = Math.ceil(height/128)*128;
       }
       const c = layer.getContext('2d');
       c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
-      c.fillStyle = '#000000'; c.fillRect(left, top, right - left, bottom - top);
-      c.setTransform(pixelScale, 0, 0, pixelScale, ox, oy);
+      c.fillStyle = '#000000'; c.fillRect(0, 0, width, height);
+      c.setTransform(pixelScale, 0, 0, pixelScale, ox-left, oy-top);
       c.globalCompositeOperation = 'lighten'; c.lineCap = 'round'; c.lineJoin = 'round';
       const fade = t => {
         const u = Math.max(0, Math.min(1, (t - start) / (end - start)));
@@ -120,8 +135,8 @@
       };
       const rgb = [1,3,5].map(n => parseInt(color.slice(n,n+2),16));
       const mask = this.ribbonMask.getContext('2d');
-      mask.setTransform(1,0,0,1,0,0); mask.clearRect(left,top,right-left,bottom-top);
-      mask.setTransform(pixelScale,0,0,pixelScale,ox,oy);
+      mask.setTransform(1,0,0,1,0,0); mask.clearRect(0,0,width,height);
+      mask.setTransform(pixelScale,0,0,pixelScale,ox-left,oy-top);
       mask.globalCompositeOperation = 'source-over'; mask.lineCap = 'round'; mask.lineJoin = 'round';
       mask.beginPath(); mask.moveTo(points[0].x,points[0].y);
       for (let i = 0; i < points.length - 1; i++) {
@@ -147,12 +162,12 @@
         mask.globalAlpha = alpha; mask.lineWidth = width; mask.stroke();
       }
       c.setTransform(1,0,0,1,0,0); c.globalAlpha = 1; c.globalCompositeOperation = 'destination-in';
-      c.drawImage(this.ribbonMask,left,top,right-left,bottom-top,left,top,right-left,bottom-top);
+      c.drawImage(this.ribbonMask,0,0,width,height,0,0,width,height);
       const target = this.ctx;
       target.save(); target.setTransform(1, 0, 0, 1, 0, 0);
       target.globalAlpha *= Math.max(0, Math.min(1, opacity));
       target.globalCompositeOperation = 'screen'; target.shadowBlur = 0;
-      target.drawImage(layer, left, top, right - left, bottom - top, left, top, right - left, bottom - top);
+      target.drawImage(layer, 0, 0, width, height, left, top, width, height);
       target.restore();
     }
     cursors(point, echo, timeline, reduced, t) {

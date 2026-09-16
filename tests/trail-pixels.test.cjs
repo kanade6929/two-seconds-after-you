@@ -69,3 +69,10 @@ test('pixels: pooled layer clears stale curves and respects resize and parent fa
     r.resize();assert.equal(difference(draw(r,2.5),draw(fresh,2.5)),0);
   }
 });
+
+test('pixels: mobile 30 Hz curve knots retain continuous crossings and no bright joins',options,()=>{
+ const {r}=scene(390,844,2);r.mobile=true;r.scale=.6;r.ox=-150;r.oy=200;
+ const a=draw(r,2.499),b=draw(r,2.501);assert.ok(difference(a,b)<.05);
+ const straight=analytic(t=>({x:300+t*200,y:325}));const light=draw(r,2,straight),row=Math.round((325*r.scale+r.oy)*2),start=Math.round((350*r.scale+r.ox)*2),end=Math.round((650*r.scale+r.ox)*2);let last=0;
+ for(let x=start;x<end;x++){const n=light[row*r.canvas.width+x];assert.ok(n>=last-3);last=n;}
+});

@@ -42,6 +42,8 @@
 
 青色拖尾 1.15 秒、暖金 0.6 秒，使用局部颜色场 + 完整路径遮罩避免交叉闪动与接缝亮珠。机关渐亮/熄灭、呼吸、粒子与全屏光波保留；减少动态不改变规则。手机重排信息与控制区，按关卡取景，Canvas 像素密度上限 2，粒子池有界，不降低两秒回放精度。
 
+手机性能：状态变化才写入界面；缓存夜空/光晕，轨迹只分配局部缓冲；图腾合并描边。手机曲线每秒取 30 个几何节点并持续平滑绘制，物理与回放仍为 120 Hz。关内画面目标 60 FPS，静态菜单背景 30 FPS；持续帧压力时将 Canvas 密度从 2 分档降至最低 1.25，HTML 字体、按钮和顶层光点仍保持设备原生清晰度。不以关闭粒子或改变规则换取速度。
+
 全局使用用户提供且确认可网页/Git 发布的方正清刻本悦宋简体，包含 Canvas 文本；原字体及许可来源说明见 `assets/字体说明.md`。版权仍属于原权利人。
 
 ## 社区接入
@@ -52,7 +54,7 @@
 
 ## 验证与发布
 
-基础测试：`node --test tests/*.test.cjs`。可选 `ECHO_CANVAS_MODULE` 指向已安装的 `@napi-rs/canvas`，启用 4 项像素回归。浏览器测试设置 `ECHO_PLAYWRIGHT_MODULE` 指向 Playwright 后运行：
+基础测试：`node --test tests/*.test.cjs`。可选 `ECHO_CANVAS_MODULE` 指向已安装的 `@napi-rs/canvas`，启用 5 项像素回归。浏览器测试设置 `ECHO_PLAYWRIGHT_MODULE` 指向 Playwright 后运行：
 
 ```text
 node tests/browser-check.cjs chrome msedge chrome-mobile chrome-mobile-landscape

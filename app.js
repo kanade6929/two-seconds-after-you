@@ -8,7 +8,7 @@
   let mode='title',game=null,raw={x:600,y:540,down:false},seen=false,inside=true,down=false,pressed=null,hovered=null,dispatching=false,mouseGestureIsLight=false;
   const follower=new Follower(raw),cursor=$('virtualCursor');
   let last=performance.now(),accumulator=0,titleTime=0,titleTimeline=new Timeline(),celebration=0,resumeAge=0,resumePlaced=false,returnMode='title',hintTier=0;
-  let audio=null,lastRevision=0;const transitions=new Map();
+  let audio=null,lastRevision=0,paintElapsed=0,lastPaint=0,paintMode='';const transitions=new Map();
   let touchMode=window.matchMedia('(pointer: coarse)').matches,touchDrag=null,touchHoldId=null;document.body.classList.toggle('touch-mode',touchMode);
   function icon(el,name){el.prepend(ArcanaSymbols.svg(name,document));}
   document.querySelectorAll('[data-symbol]').forEach(el=>icon(el,el.dataset.symbol));
@@ -53,7 +53,9 @@
   function home(){checkpoint();titleTimeline=new Timeline();titleTime=0;show('title');controls();}
   function retry(){if(game)enter(game.index,game.checkpoint());}
   function updateStatus(){
-    $('status').textContent=game.view.clickable?game.view.actionLabel+' · 两光仍需保持合作。':game.status();$('phaseLabel').textContent=`第 ${game.state.phase+1} 阵 / ${game.level.phases}`;
+    const status=game.view.clickable?game.view.actionLabel+' · 两光仍需保持合作。':game.status(),phase=`第 ${game.state.phase+1} 阵 / ${game.level.phases}`;
+    if($('status').textContent!==status)$('status').textContent=status;
+    if($('phaseLabel').textContent!==phase)$('phaseLabel').textContent=phase;
     visible('hintButton',game.t-game.progressAt>=25);
   }
   function win(){
@@ -77,7 +79,7 @@
       const wasOpen=game.open;game.update(STEP,p);if(game.blocked)follower.reset(game.point);afterUpdate(wasOpen);
     }else if(mode==='title'){titleTime+=STEP;if(seen)titleTimeline.add(titleTime,p);}
   }
-  function cssPoint(){const r=$('canvas').getBoundingClientRect();return{x:r.left+renderer.ox+follower.x*renderer.scale,y:r.top+renderer.oy+follower.y*renderer.scale};}
+  function cssPoint(){const r=renderer.rect;return{x:r.left+renderer.ox+follower.x*renderer.scale,y:r.top+renderer.oy+follower.y*renderer.scale};}
   function atCursor(){const p=cssPoint();return document.elementFromPoint(p.x,p.y);}
   function interactive(){const el=atCursor()?.closest('button,input,textarea');return el&&!el.disabled&&!el.closest('[inert],[hidden]')?el:null;}
   function updateCursor(){
@@ -88,8 +90,14 @@
   function frame(now){
     const elapsed=Math.min(.1,Math.max(0,(now-last)/1000));last=now;
     if(!document.hidden){const scene=game?.transition?.remaining>.26?game.transition.previous:game;renderer.layout(scene&&!['title','menu','community','ending'].includes(mode)?scene:null,touchMode);accumulator+=elapsed;while(accumulator>=STEP){step();accumulator-=STEP;}
-      if(['title','menu','community','ending'].includes(mode))renderer.title(null,titleTimeline.at(titleTime-2),titleTimeline,titleTime,reduced);
-      else if(game){renderer.game(game,mode,reduced,['paused','resuming'].includes(mode)?0:elapsed);if(mode==='play')updateStatus();if(mode==='celebrate'){celebration+=elapsed;renderer.ripple(game.winOrigin,celebration,reduced);if(celebration>=(reduced?.4:1.1))show('complete');}}
+      paintElapsed+=elapsed;
+      const interval=touchMode?(['play','celebrate','resuming'].includes(mode)?1/60:1/30):0;
+      if(paintElapsed>=interval-.001||paintMode!==mode){
+        const drawDt=Math.min(.1,lastPaint?(now-lastPaint)/1000:elapsed);paintElapsed=interval?Math.max(0,paintElapsed-interval):0;paintMode=mode;const startPaint=performance.now();
+        if(['title','menu','community','ending'].includes(mode))renderer.title(null,titleTimeline.at(titleTime-2),titleTimeline,titleTime,reduced);
+        else if(game){renderer.game(game,mode,reduced,['paused','resuming'].includes(mode)?0:drawDt);if(mode==='play')updateStatus();if(mode==='celebrate'){celebration+=drawDt;renderer.ripple(game.winOrigin,celebration,reduced);if(celebration>=(reduced?.4:1.1))show('complete');}}
+        const frameMs=now-lastPaint;lastPaint=now;renderer.adapt(frameMs,performance.now()-startPaint,mode==='play'&&!game.transition);
+      }
       updateCursor();
     }requestAnimationFrame(frame);
   }
