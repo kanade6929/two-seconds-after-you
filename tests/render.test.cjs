@@ -75,10 +75,10 @@ test('click reminder follows live permission, never afterglow or a paused scene'
   const {driver}=require('./routes.cjs'),d=driver(0),g=d.g,{r}=renderer(),calls=[];
   r.clickCue=(...args)=>calls.push(args);
   r.game(g,'play',false);assert.equal(calls.length,0);
-  d.move(g.level.seal,3);d.until(()=>g.open,g.level.exit);
-  r.game(g,'play',false);assert.equal(calls.length,1);assert.equal(calls[0][1],'点击完成');
+  d.pin(g.level.seal);d.move(g.level.exit,10);
+  r.game(g,'play',false);assert.equal(calls.length,1);assert.equal(calls[0][1],'点击抵达');
   r.game(g,'pause',false);assert.equal(calls.length,1);
-  d.move(g.level.exit,2.2);assert.equal(g.view.clickable,false);
+  d.release();assert.equal(g.view.clickable,false);
   r.game(g,'play',false);assert.equal(calls.length,1);assert.ok(r.nodeLights.get('exit')>0);
 });
 
@@ -97,8 +97,8 @@ test('click reminder breathes normally but stays static with reduced motion',()=
   assert.equal(capture(.25,false).filter(v=>v[0]==='frame').length,2);
 });
 
-test('stage transition draws old and new scenes without a hard cut or active click cue',()=>{
-  const {driver}=require('./routes.cjs'),d=driver(0),g=d.g,{r,ctx}=renderer();d.until(()=>g.state.phase===1,g.level.seal);
+test('renderer transition snapshots fade out and in without active click cues',()=>{
+  const g=new Core.Game(1),{r,ctx}=renderer();g.state.phase=1;g.transition={duration:.44,remaining:.44,previous:new Core.Game(0)};
   const scenes=[],alphas=[];const scene=r.scene.bind(r);r.scene=(s,m,...args)=>{scenes.push([s.state.phase,m]);scene(s,m,...args);};
   const blit=ctx.drawImage;ctx.drawImage=function(...a){alphas.push(this.globalAlpha);blit(...a);};
   g.update(.09,g.point);r.game(g,'play',false,.09);assert.equal(scenes[0][0],0);assert.equal(scenes[0][1],'transition');assert.ok(alphas.at(-1)>.4&&alphas.at(-1)<.6);
@@ -121,7 +121,28 @@ test('mobile pixel adaptation requires sustained pressure and never moves logica
 });
 
 test('moon renderer never draws the memory answer at its header while the well is active',()=>{
- const {driver}=require('./routes.cjs'),d=driver(5),{r}=renderer(),draws=[];r.sigil=(name,x,y)=>draws.push({name,x,y});
- r.game(d.g,'play',false);assert.deepEqual(draws.filter(p=>p.y===160),[{name:'星星',x:560,y:160}]);
- draws.length=0;d.move(Core.Rules.moonWell,3);r.game(d.g,'play',false);assert.equal(draws.filter(p=>p.y===160).length,0);
+ const {driver}=require('./routes.cjs'),d=driver(5),{r}=renderer(),draws=[];r.rune=(glyph,x,y)=>draws.push({glyph,x,y});
+ r.game(d.g,'play',false);assert.deepEqual(draws.filter(p=>p.y===175),[{glyph:Core.Rules.moonTarget,x:600,y:175}]);
+ draws.length=0;d.pin(Core.Rules.moonWell);r.game(d.g,'play',false);assert.equal(draws.filter(p=>p.y===175).length,0);
+ d.release();r.game(d.g,'play',false);assert.equal(draws.filter(p=>p.y===175).length,1);
+});
+
+test('lovers reflections render above opaque mechanisms, with two distinct mirror lights',()=>{
+ const {driver}=require('./routes.cjs'),d=driver(2),{r}=renderer(),draws=[];d.pin({x:780,y:280});d.move({x:435,y:350},5);
+ r.glow=(p,color,t,reduced,alpha,core)=>{if(core)draws.push({x:Math.round(p.x),y:Math.round(p.y),color});};
+ r.game(d.g,'play',false);assert.deepEqual(draws.slice(-2).map(p=>[p.x,p.y]),[d.g.view.mirror.now,d.g.view.mirror.past].map(p=>[Math.round(p.x),Math.round(p.y)]));
+ assert.notEqual(draws.at(-1).color,draws.at(-2).color);
+});
+
+test('changed light paths and sun windows fade independently, without delaying logical state',()=>{
+ const {driver}=require('./routes.cjs'),d=driver(6),{r}=renderer();d.pin(Core.Rules.sunSource);for(let i=0;i<20;i++)r.game(d.g,'play',false,1/120);
+ assert.ok(r.windowLights[0]>.9);d.tap(Core.Rules.sunKeys[0]);r.game(d.g,'play',false,1/120);assert.equal(d.g.view.lightWindows[0].on,false);assert.ok(r.windowLights[0]>.5);
+ const old=[...r.beamLights.values()][0];d.release();r.game(d.g,'play',false,1/120);assert.ok(old.light>0);for(let i=0;i<100;i++)r.game(d.g,'play',false,1/120);assert.ok([...r.beamLights.values()].every(b=>b.light>.9));
+});
+
+test('small-screen action captions do not overprint memory guidance or water amounts',()=>{
+ const {driver}=require('./routes.cjs'),d=driver(5),{r}=renderer();r.mobile=true;r.scale=.35;const labels=[];r.text=(text,x,y)=>labels.push({text,x,y});
+ d.pin(Core.Rules.moonWell);for(const p of Core.Rules.moonOptions){d.move(p,3);labels.length=0;r.game(d.g,'play',false);assert.equal(labels.filter(l=>l.text==='确认倒影').length,1);assert.equal(labels.filter(l=>l.text==='凭记忆辨认').length,0);}
+ const cups=driver(3);cups.pin(Core.Rules.cups[0]);cups.move(Core.Rules.cups[1],3);labels.length=0;r.game(cups.g,'play',false);
+ const action=labels.find(l=>l.text==='倒入此杯'),amount=labels.find(l=>l.text==='0'&&l.x===600);assert.ok((amount.y-action.y)*r.scale>=15.99);
 });

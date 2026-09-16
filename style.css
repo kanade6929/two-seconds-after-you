@@ -162,8 +162,9 @@ form button{justify-self:start;margin:7px 0 16px}
 .touch-mode .phase-label{display:none}
 .touch-mode .game-bottom{left:14px;right:14px;bottom:calc(176px + env(safe-area-inset-bottom));display:block}
 .touch-mode .game-bottom p{max-width:100%;font-size:13px;line-height:1.65;margin-bottom:9px;min-height:42px}
-.touch-mode .game-bottom .button-row{display:flex;justify-content:flex-end;gap:8px}
-.touch-mode .game-bottom button{font-size:14px;min-height:44px;padding:9px 13px}
+.touch-mode .game-bottom .button-row{display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+.touch-mode .game-bottom button{font-size:13px;min-height:44px;padding:8px}
+.touch-mode .game-bottom button svg{width:17px;height:17px}
 .touch-mode footer{left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));font-size:11px}
 .touch-mode footer>span{display:none}
 .touch-mode .legend{gap:24px}

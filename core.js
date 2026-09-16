@@ -23,7 +23,7 @@
       }this.down=!!target.down;return {x:this.x,y:this.y,down:this.down};
     }
   }
-  function readProgress(raw={}){if(!raw||typeof raw!=='object')raw={};const max=LEVELS.length-1,completed=Array.isArray(raw.completed)?[...new Set(raw.completed.filter(n=>Number.isInteger(n)&&n>=0&&n<=max))]:[],unlocked=clamp(Math.max(0,...completed.map(n=>n+1),Number.isInteger(raw.unlocked)?raw.unlocked:0),0,max),current=clamp(Number.isInteger(raw.current)?raw.current:0,0,unlocked),checkpoints={};for(let i=0;i<LEVELS.length;i++){const c=raw.checkpoints?.[i];if(c&&Number.isInteger(c.phase)&&c.phase>=0&&c.phase<=8)checkpoints[i]={phase:Math.min(c.phase,LEVELS[i].phases-1),...(i===7?{turns:Rules.worldRestore(c.turns)}:{})};}return {completed,unlocked,current,started:raw.started===true||completed.length>0,checkpoints};}
+  function readProgress(raw={}){if(!raw||typeof raw!=='object')raw={};const max=LEVELS.length-1,completed=Array.isArray(raw.completed)?[...new Set(raw.completed.filter(n=>Number.isInteger(n)&&n>=0&&n<=max))]:[],unlocked=clamp(Math.max(0,...completed.map(n=>n+1),Number.isInteger(raw.unlocked)?raw.unlocked:0),0,max),current=clamp(Number.isInteger(raw.current)?raw.current:0,0,unlocked),checkpoints={};for(let i=0;i<LEVELS.length;i++){const c=raw.checkpoints?.[i];if(c&&c.phase===0){const s=Rules.create(i,c),anchor=Rules.restoreAnchor(i,c);checkpoints[i]={...s,anchor:anchor?.id||null,...(anchor?.id==='reflection'?{anchorPoint:{x:anchor.x,y:anchor.y}}:{})};}}return {completed,unlocked,current,started:raw.started===true||completed.length>0,checkpoints};}
   // One thumb surface: tap confirms, drag moves, a still press holds.
   // Distances are CSS pixels, so touch slop is independent of the game camera.
   class TouchGesture{
@@ -39,18 +39,23 @@
     end(id){if(this.id!==id)return false;const tap=!this.dragging&&!this.held;this.cancel();return tap;}
   }
   class Game{
-    constructor(index=0,checkpoint={}){this.index=index;this.level=LEVELS[index];this.state=Rules.create(index,checkpoint);this.point={...this.level.spawn,down:false};this.echo=null;this.t=0;this.timeline=new Timeline();this.timeline.add(0,this.point);this.timers={};this.contacts={};this.hold=0;this.need=.3;this.open=false;this.won=false;this.ready=false;this.winOrigin={...this.point};this.revision=0;this.progressAt=0;this.effect={};this.blocked=false;this.view=Rules.view(this);}
+    constructor(index=0,checkpoint={}){this.index=index;this.level=LEVELS[index];this.state=Rules.create(index,checkpoint);this.point={...this.level.spawn,down:false};this.echo=null;this.t=0;this.timeline=new Timeline();this.timeline.add(0,this.point);this.timers={};this.contacts={};this.hold=0;this.need=1;this.open=false;this.won=false;this.ready=false;this.winOrigin={...this.point};this.revision=0;this.progressAt=0;this.effect={};this.blocked=false;this.memory=null;this.pending=null;this.history=[];const anchor=Rules.restoreAnchor(index,checkpoint);if(anchor)this.pending={...anchor,at:2};this.view=Rules.view(this);}
     update(dt,input,click=false){
       if(this.won)return;
       if(this.transition){this.transition.remaining=Math.max(0,this.transition.remaining-dt);if(this.transition.remaining<1e-8)this.transition=null;return;}
       this.t+=dt;this.blocked=false;let p={x:input.x,y:input.y,down:!!input.down};
-      const walls=this.level.id==='sun'?Rules.sunLayout(this.state.phase).walls:[];let nearest=null;
+      const walls=this.view.walls||[];let nearest=null;
       for(const [a,b]of walls){const hit=Rules.intersection(this.point,p,a,b);if(hit&&hit.t>1e-7&&(!nearest||hit.t<nearest.t))nearest=hit;}
       if(nearest){const dx=p.x-this.point.x,dy=p.y-this.point.y,n=Math.hypot(dx,dy)||1;p={x:nearest.x-dx/n*2,y:nearest.y-dy/n*2,down:p.down};this.blocked=true;}
       this.point=p;this.timeline.add(this.t,p);this.echo=this.timeline.at(this.t-DELAY);
-      Rules.update(this,dt,click);this.view=Rules.view(this);
+      const before=click?this.snapshot():null,revision=this.revision;
+      Rules.update(this,dt,click);
+      if(click&&this.revision!==revision){this.history.push(before);if(this.history.length>64)this.history.shift();}
     }
-    checkpoint(){return {phase:this.state.phase,...(this.level.id==='world'?{turns:[...this.state.turns]}:{})};}
+    checkpoint(){return Rules.checkpoint(this);}
+    snapshot(){return {state:JSON.parse(JSON.stringify(this.state)),memory:this.memory&&{...this.memory},pending:this.pending&&{...this.pending,at:this.pending.at-this.t}};}
+    undo(){if(this.won)return false;const past=this.history.pop();if(!past)return false;this.state=past.state;this.memory=past.memory;this.pending=past.pending&&{...past.pending,at:this.t+past.pending.at};this.echo=this.memory?{...this.memory,down:false}:this.timeline.at(this.t-DELAY);this.state.error=0;this.revision++;this.progressAt=this.t;this.view=Rules.view(this);this.ready=this.open=this.view.clickable;return true;}
+    release(){if(!this.memory&&!this.pending)return false;this.history.push(this.snapshot());if(this.history.length>64)this.history.shift();this.memory=this.pending=null;this.echo=this.timeline.at(this.t-DELAY);this.state.error=0;this.revision++;this.progressAt=this.t;this.view=Rules.view(this);this.ready=this.open=this.view.clickable;return true;}
     status(){return this.view.message;}
   }
   const api={STEP,DELAY,HOLD,WIDTH,HEIGHT,MAX_SPEED,MAX_ACCEL,LEVELS,Rules,distance,segmentDistance,Timeline,Follower,TouchGesture,Game,readProgress};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.EchoCore=api;

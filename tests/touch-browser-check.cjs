@@ -7,7 +7,7 @@ async function run(width,height){
  const browser=await chromium.launch({channel:'chrome',headless:true});try{
  const c=await browser.newContext({viewport:{width,height},isMobile:true,hasTouch:true,deviceScaleFactor:3}),p=await c.newPage(),cdp=await c.newCDPSession(p),errors=[];
  p.on('pageerror',e=>errors.push(e.message));await p.clock.install({time:new Date('2026-09-16T00:00:00Z')});await p.clock.pauseAt(new Date('2026-09-16T00:00:01Z'));
- await p.addInitScript(save=>{localStorage.setItem('two-seconds-after-you.arcana.v2',save);let Renderer;Object.defineProperty(window,'EchoRenderer',{get(){return Renderer;},set(R){Renderer=class extends R{game(g,m,...a){window.__touch={g,m,r:this};super.game(g,m,...a);}};}});},fs.readFileSync(path.join(dir,'chrome-completed-save.json'),'utf8'));
+ await p.addInitScript(save=>{localStorage.setItem('two-seconds-after-you.arcana.v3',save);let Renderer;Object.defineProperty(window,'EchoRenderer',{get(){return Renderer;},set(R){Renderer=class extends R{game(g,m,...a){window.__touch={g,m,r:this};super.game(g,m,...a);}};}});},fs.readFileSync(path.join(dir,'chrome-completed-save.json'),'utf8'));
  await p.goto('http://127.0.0.1:4173');await p.evaluate(()=>document.fonts.ready);const tick=s=>p.clock.runFor(Math.round(s*1000));await tick(.5);
  await p.locator('#titleLevels').tap();await tick(.4);await p.locator('#levelItems button').nth(1).tap();await tick(.7);
  const pad=p.locator('#touchPad');assert.equal(await p.locator('#touchControls button').count(),1);assert.equal(await p.locator('#touchConfirm').count(),0);
@@ -30,7 +30,7 @@ async function run(width,height){
  // OS cancellation and pause both discard the contact, not turn it into a tap.
  await finger('touchStart',await center());await tick(.3);await finger('touchCancel');await tick(.04);assert.equal((await state()).point.down,false);assert.equal((await state()).gesture,'idle');
  await finger('touchStart',await center());await tick(.3);await p.keyboard.press('Escape');await tick(.4);await finger('touchEnd');await p.locator('#resume').tap();await tick(.6);assert.equal((await state()).point.down,false);assert.equal((await state()).angle,1);
- await pad.focus();await p.keyboard.press('Enter');await tick(.05);assert.equal((await state()).angle,2,'keyboard activation is one confirmation');
+ await dragTo(mirror);await pad.focus();await p.keyboard.press('Enter');await tick(.05);assert.equal((await state()).angle,2,'keyboard activation at the visible light is one confirmation');
  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(await p.evaluate(()=>[...document.querySelectorAll('#touchControls button,#touchControls span,#touchControls small')].filter(el=>el.scrollWidth>el.clientWidth+2).map(el=>el.textContent)),[]);
  await p.screenshot({path:path.join(dir,`single-pad-${width}x${height}-idle.png`)});assert.deepEqual(errors,[]);console.log(`${width}x${height}: pad-only drag, single tap, hold, jitter, cancellation, pause and keyboard passed`);
  }finally{await browser.close();}

@@ -1,31 +1,28 @@
-// Real follower paths only; never assign phase, power, echo or won state.
+// Input-only solvers. All operations travel through Game.update / public actions.
 const {STEP,Follower,Game,Rules:R}=require('../core.js');
 function driver(index,checkpoint){const g=new Game(index,checkpoint),f=new Follower(g.point);return {g,f,
- move(p,seconds=1.6,down=false){for(let i=0;i<Math.round(seconds/STEP)&&!g.won;i++){if(g.transition){g.update(STEP,g.point);f.reset(g.point);i--;continue;}g.update(STEP,f.update(STEP,{...p,down}));if(g.blocked)f.reset(g.point);}},
- until(predicate,p,limit=8,down=false){for(let i=0;i<limit/STEP&&!predicate();i++)this.move(p,STEP,down);if(!predicate())throw Error(`timeout ${g.level.id}: ${g.status()} phase=${g.state.phase} energy=${g.state.energy}`);},
- click(){g.update(0,{...g.point,down:true},true);},
- tap(p){this.move(p,1.4);this.click();this.move(p,.03);}
+ move(p,seconds=1.8,down=false){for(let i=0;i<Math.round(seconds/STEP)&&!g.won;i++){g.update(STEP,f.update(STEP,{...p,down}));if(g.blocked)f.reset(g.point);}},
+ until(predicate,p,limit=8,down=false){for(let i=0;i<limit/STEP&&!predicate();i++)this.move(p,STEP,down);if(!predicate())throw Error('timeout '+g.level.id+': '+g.status());},
+ click(){g.update(0,{...g.point,down:true},true);},tap(p){this.move(p);this.click();this.move(p,.04);},
+ pin(p){this.tap(p);this.move(p,2.1);},release(){g.release();},undo(){g.undo();}
 };}
 function solvePuzzle(d,index){const g=d.g;
- if(index===0){d.move(g.level.seal,3);d.until(()=>g.open,g.level.exit);d.click();}
- if(index===1)for(let phase=g.state.phase;phase<3;phase++){
-  const m=R.magicLayout(phase),angles=[[0,1],[1,1],[2,2]][phase];
-  for(let i=0;i<2;i++)for(let n=0;n<angles[i];n++)d.tap(m.mirrors[i]);
-  d.move(m.source,3);d.until(()=>g.open,m.receiver);d.click();
+ if(index===0){d.pin(g.level.seal);d.move(g.level.exit,12);d.click();}
+ if(index===1){const m=R.magicLayout();for(let i=0;i<2;i++)while(g.state.orientations[i]!==1)d.tap(m.mirrors[i]);d.pin(m.source);d.move(m.receiver,12);d.click();}
+ if(index===2){d.release();d.pin(R.mirrorPoint(R.loversSeals[0]));d.move(R.mirrorPoint(R.loversSeals[1]),12);}
+ if(index===3){
+  // Breadth-first plan from actual conserved water, useful after undo/refresh.
+  const queue=[{water:g.state.water,steps:[]}],seen=new Set();
+  for(let h=0;h<queue.length;h++){const {water,steps}=queue[h],key=water.join();if(seen.has(key))continue;seen.add(key);
+   if(water[0]===4&&water[1]===4){for(const [a,b]of steps){d.release();d.pin(R.cups[a]);d.move(R.cups[b],4);d.click();}break;}
+   for(let a=0;a<3;a++)for(let b=0;b<3;b++){const next=R.pour(water,a,b);if(next)queue.push({water:next,steps:[...steps,[a,b]]});}
+  }
  }
- if(index===2)for(let phase=g.state.phase;phase<3;phase++){const [past,now]=R.loversPairs[phase];d.move(past,2.6,true);d.move(now,.9);d.until(()=>g.state.phase>phase||g.won,now,4,true);}
- if(index===3)for(let phase=g.state.phase;phase<2;phase++){d.move(R.balancePads[phase===0?2:1],3);d.until(()=>g.state.phase>phase||g.won,R.balancePads[phase===0?4:5]);}
- if(index===4)for(let phase=g.state.phase;phase<4;phase++){const m=R.starLayout(phase);d.move(m.reversed?m.b:m.a,3);d.until(()=>g.open,m.reversed?m.a:m.b);d.click();}
- if(index===5)for(let phase=g.state.phase;phase<3;phase++){
-  d.move(R.moonWell,3);
-  const p=R.moonOptions[R.moonMaps[phase].indexOf(R.moonTargets[phase])];d.until(()=>g.open,p);d.click();
- }
- if(index===6)for(let phase=g.state.phase;phase<3;phase++){
-  const m=R.sunLayout(phase);d.move({x:780,y:490},2);d.move({x:400,y:490},2);d.move(m.pads[0],3);
-  const y=phase===1?408:322;d.move({x:565,y},.45);d.move({x:635,y},.35);d.move(m.pads[1],.5);d.until(()=>g.state.phase>phase||g.won,m.pads[1],3,phase===2);
- }
- if(index===7){for(let i=1;i<4;i++){let turns=(i-g.state.turns[i]+4)%4;if(!turns)continue;d.move(R.worldVertices[0],3);for(let n=0;n<turns;n++){d.until(()=>g.open,R.worldVertices[i]);d.click();}}}
+ if(index===4){d.release();d.pin(R.starVertices[0]);for(const i of [1,2,3,1,4,3,0,4]){d.move(R.starVertices[i],4);d.click();}}
+ if(index===5){d.pin(R.moonWell);d.move(R.moonOptions[R.moonAnswer],12);d.click();}
+ if(index===6){for(let i=0;i<3;i++)if(!!(g.state.mask&(1<<i))!==(i<2))d.tap(R.sunKeys[i]);d.release();d.pin(R.sunSource);}
+ if(index===7){for(let i=1;i<4;i++){const n=(i-g.state.turns[i]+4)%4;if(!n)continue;d.release();d.pin(R.worldVertices[0]);for(let j=0;j<n;j++)d.tap(R.worldVertices[i]);}}
  return g;
 }
-function solve(d,index){solvePuzzle(d,index);if(!d.g.won)throw Error(`not complete ${index} phase=${d.g.state.phase}`);return d.g;}
+function solve(d,index){solvePuzzle(d,index);if(!d.g.won)throw Error('not complete '+index+' '+d.g.status());return d.g;}
 module.exports={driver,solve,solvePuzzle};

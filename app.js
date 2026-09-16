@@ -1,9 +1,9 @@
 (function(){
   'use strict';
   const {Game,Timeline,Follower,TouchGesture,LEVELS,STEP,readProgress}=EchoCore,$=id=>document.getElementById(id);
-  const renderer=new EchoRenderer($('canvas')),saveKey='two-seconds-after-you.arcana.v2';
+  const renderer=new EchoRenderer($('canvas')),saveKey='two-seconds-after-you.arcana.v3';
   function read(key){try{return JSON.parse(localStorage.getItem(key))||{};}catch{return {};}}
-  const old=read('two-seconds-after-you.v1'),saved=read(saveKey),progress=readProgress(saved);
+  const legacy=read('two-seconds-after-you.arcana.v2'),old=Object.keys(legacy).length?legacy:read('two-seconds-after-you.v1'),current=read(saveKey),saved=Object.keys(current).length?current:{...legacy,checkpoints:{}},progress=readProgress(saved);
   let muted=(saved.muted??old.muted)===true,reduced=saved.reduced??old.reduced??window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let mode='title',game=null,raw={x:600,y:540,down:false},seen=false,inside=true,down=false,pressed=null,hovered=null,dispatching=false,mouseGestureIsLight=false;
   const follower=new Follower(raw),cursor=$('virtualCursor');
@@ -54,11 +54,13 @@
   function pause(){if(['play','resuming'].includes(mode)){checkpoint();show('paused');}}
   function resume(){if(mode!=='paused')return;unlockAudio();resumeAge=0;resumePlaced=false;show('resuming');}
   function home(){checkpoint();titleTimeline=new Timeline();titleTime=0;show('title');controls();}
-  function retry(){if(game)enter(game.index,game.checkpoint());}
+  function retry(){if(game)enter(game.index);}
   function updateStatus(){
-    const status=game.view.clickable&&!game.state.error?game.view.actionLabel+' · 两光仍需保持合作。':game.status(),phase=`第 ${game.state.phase+1} 阵 / ${game.level.phases}`;
+    const status=game.status(),phase='一张牌 · 一个谜题';
     if($('status').textContent!==status)$('status').textContent=status;
     if($('phaseLabel').textContent!==phase)$('phaseLabel').textContent=phase;
+    $('undo').disabled=game.history.length===0;$('release').disabled=!game.memory&&!game.pending;
+    const label=game.pending?'取消留影':'收回留影';if($('releaseLabel').textContent!==label)$('releaseLabel').textContent=label;
     visible('hintButton',game.t-game.progressAt>=25);
   }
   function win(){
@@ -66,8 +68,7 @@
     $('completeSigil').replaceChildren(ArcanaSymbols.svg(game.level.title,document));$('completeTitle').textContent=game.level.title+' · 已抵达';$('completeText').textContent=game.level.done;$('nextLabel').textContent=game.index===7?'与自己相逢':'翻开下一张牌';celebration=0;show('celebrate');tone(130.81,1,.04);tone(523.25,.9,.035);tone(783.99,1.1,.018);
   }
   function afterUpdate(wasOpen){
-    if(game.revision!==lastRevision){lastRevision=game.revision;resetTouch();checkpoint();hintTier=0;visible('hint',false);tone(659.25,.45);}
-    else if(!wasOpen&&game.open)tone(523.25,.3);
+    if(game.revision!==lastRevision){lastRevision=game.revision;checkpoint();tone(659.25,.25);}
     if(game.won)win();
   }
   function step(){
@@ -136,7 +137,8 @@
   document.addEventListener('visibilitychange',()=>{if(document.hidden){pause();accumulator=0;}last=performance.now();});window.addEventListener('resize',()=>{renderer.resize();pause();});
   window.addEventListener('pagehide',checkpoint);
   window.addEventListener('keydown',e=>{if(e.isComposing)return;if(e.key==='Escape'){if(mode==='menu')closeMenu();else if(mode==='community')home();else if(!$('hint').hidden)visible('hint',false);else pause();}});
-  $('start').onclick=()=>enter(0);$('continueGame').onclick=()=>{if(progress.started)enter(progress.current,progress.checkpoints[progress.current]||{});};$('retry').onclick=$('pauseRetry').onclick=retry;$('pause').onclick=pause;$('resume').onclick=resume;
+  $('start').onclick=()=>enter(0);$('continueGame').onclick=()=>{if(progress.started)enter(progress.current,progress.checkpoints[progress.current]||{});};$('pauseRetry').onclick=retry;$('pause').onclick=pause;$('resume').onclick=resume;
+  $('undo').onclick=()=>{if(mode==='play'&&game.undo()){resetTouch();afterUpdate(false);}};$('release').onclick=()=>{if(mode==='play'&&game.release()){resetTouch();afterUpdate(false);}};
   $('home').onclick=$('pauseHome').onclick=$('endingHome').onclick=home;
   $('sound').onclick=()=>{muted=!muted;controls();persist();unlockAudio();tone();};$('motion').onclick=()=>{reduced=!reduced;controls();persist();};
   $('hintButton').onclick=()=>{hintTier=0;showHint();};function showHint(){$('hintText').textContent=game.level.hint[hintTier];$('hintNext').disabled=hintTier===1;visible('hint',true);}
