@@ -82,3 +82,30 @@ nav button:hover::after,nav button[aria-expanded="true"]::after{opacity:.65;tran
 .level-choice:nth-last-child(-n+2){border-bottom:1px solid var(--line)}
 @media(max-height:720px){.title-copy h1{font-size:48px}.title-copy .intro{margin:15px 0;font-size:13px}.english-title{margin-top:12px}.title-actions{gap:0;margin-top:9px}.title-actions button{padding:6px 0}.title-copy>.micro{margin-top:10px}.level-menu{padding-top:95px}.level-menu h2{margin-bottom:15px}.level-choice{padding:16px 0}}
 @media(max-width:700px){#levelItems{grid-template-columns:1fr}.level-menu{padding-left:8%;padding-right:8%}.level-choice:nth-last-child(2){border-bottom:0}}
+
+/* Arcana: cut paper edges, engraved brass rules, and straight-line seals.
+   Preserve the quiet night palette and keep ornament away from button text. */
+:root{--arcana-gold:#d9bb8a;--arcana-rule:#87734f;--arcana-cut:9px}
+button:not(.wordmark){letter-spacing:.055em}
+.primary{position:relative;isolation:isolate;min-width:210px;min-height:54px;padding:17px 54px 17px 25px;border:0;border-radius:0;background:var(--arcana-rule);color:#eee1c8;clip-path:polygon(var(--arcana-cut) 0,calc(100% - var(--arcana-cut)) 0,100% var(--arcana-cut),100% calc(100% - var(--arcana-cut)),calc(100% - var(--arcana-cut)) 100%,var(--arcana-cut) 100%,0 calc(100% - var(--arcana-cut)),0 var(--arcana-cut));transition:background-color .28s,color .28s,filter .35s,transform .22s}
+.primary::before{content:"";position:absolute;inset:1px;z-index:-1;background:linear-gradient(110deg,#1d2730,#101b27);clip-path:inherit;transition:background-color .3s,opacity .3s}
+.primary::after{content:"";position:absolute;right:22px;top:calc(50% - 6px);width:10px;height:10px;transform:rotate(45deg);border:1px solid var(--arcana-gold);box-shadow:3px -3px 0 -2px #101b27,3px -3px 0 -1px var(--arcana-rule);opacity:.8;transition:transform .4s,opacity .3s}
+.primary>span{display:none}
+.primary:hover:not(:disabled){background:#f1d5a4;color:#fff2d7;box-shadow:none;filter:drop-shadow(0 0 8px #edbd8828)}
+.primary:hover:not(:disabled)::before{opacity:.82}
+.primary:hover:not(:disabled)::after{transform:rotate(135deg);opacity:1}
+.primary:active:not(:disabled){filter:brightness(1.12);transform:scale(.975)}
+.primary:focus-visible{outline:0;background:#fff0c9;filter:drop-shadow(0 0 5px #f1d5a4)}
+.primary:focus-visible::before{inset:3px}
+.topbar nav button,.title-actions button,.game-bottom button,.text-button,#closeLevels{border-radius:0;border-bottom:1px solid #d9bb8a32}
+.topbar nav button:hover,.title-actions button:hover,.game-bottom button:hover,.text-button:hover,#closeLevels:hover{border-bottom-color:var(--arcana-gold);color:#f0d8b2}
+.topbar nav button::after{background:var(--arcana-gold)}
+.title-actions{gap:6px}.title-actions button{padding:7px 0}
+.level-choice{position:relative;border-color:#d9bb8a32;gap:16px;align-items:center}
+.level-choice strong{display:block;line-height:1.5}.arcana-name{display:block;margin-top:7px;padding-left:2.65em;font-size:10px;font-weight:400;letter-spacing:.16em;color:var(--arcana-gold)}
+.level-choice:disabled .arcana-name{color:#9aafc0;opacity:.7}
+.level-choice:hover:not(:disabled){background:#d9bb8a06}
+.level-menu h2::after{content:"";display:inline-block;width:34px;height:1px;margin:0 0 9px 18px;background:var(--arcana-rule)}
+.reduced .primary:hover:not(:disabled)::after{transform:rotate(45deg)}
+@media(prefers-reduced-motion:reduce){.primary:hover:not(:disabled)::after{transform:rotate(45deg)}}
+@media(max-height:720px){.primary{min-height:48px;padding-top:13px;padding-bottom:13px}.arcana-name{margin-top:3px}.level-choice{padding:12px 0}}

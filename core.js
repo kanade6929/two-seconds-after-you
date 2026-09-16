@@ -2,30 +2,30 @@
   'use strict';
   const STEP = 1 / 120, DELAY = 2, HOLD = .2, WIDTH = 1200, HEIGHT = 650;
   const LEVELS=[
-    {title:'留一下',rule:'hold',description:'先停一下，再离开。让两秒前的自己接手。',
+    {title:'留一下',arcana:'0 · 愚者',rule:'hold',description:'先停一下，再离开。让两秒前的自己接手。',
       switches:[{x:370,y:350,label:'留一束光'}],exit:{x:850,y:350},
       hint:'在左侧停留半秒，再到出口。暖金影子抵达开关时，点击亮起的门。',done:'过去的你，接住了现在。',after:'短短两秒，也足够成为彼此的依靠。'},
-    {title:'交换位置',rule:'swap',description:'先昔在左、现在右；再交换身份，完成第二次共鸣。',
+    {title:'交换位置',arcana:'VI · 恋人',rule:'swap',description:'先昔在左、现在右；再交换身份，完成第二次共鸣。',
       switches:[{x:375,y:380,label:'左岸'},{x:825,y:380,label:'右岸'}],exit:{x:600,y:240},
       hint:'先在左岸留光，再去右岸等影子，完成第一段。随后回到左岸，等影子到右岸，各占位 0.3 秒。两段都会保留。',done:'换一个位置，看见自己。',after:'配合，也可以是把刚才的角色交给对方。'},
-    {title:'借光穿行',rule:'gate',description:'只有过去能开闸。让影子守住左侧，自己从光隙穿过。',
+    {title:'借光穿行',arcana:'VII · 战车',rule:'gate',description:'只有过去能开闸。让影子守住左侧，自己从光隙穿过。',
       switches:[{x:310,y:350,label:'昔 · 开闸',role:'echo'}],exit:{x:935,y:350},gate:{x:610,y:350,half:88},spawn:{x:180,y:490},
       hint:'左侧开关只接受暖金影子。在它上面停半秒，移到闸门前等待；光隙打开后，从中央横穿，再点击出口。上下绕行不可穿越屏障。',done:'有人留在身后，路就打开了。',after:'过去守着那道门，你只管向前。'},
-    {title:'迟来的暗号',rule:'code',description:'点击留下暗号。两秒后的回声才会输入它：乙 → 甲 → 乙 → 丙。',
-      switches:[{x:330,y:365,label:'甲 · 点击'},{x:590,y:285,label:'乙 · 点击'},{x:820,y:390,label:'丙 · 点击'}],exit:{x:1030,y:300},code:[1,0,1,2],
-      hint:'依次点击乙、甲、乙、丙，每次等光点靠近再点。只有两秒后重播的点击才算输入；多点或点错会清空暗号，等旧回声结束再重输。单纯停留不会点亮。',done:'你说过的话，时间记得。',after:'有些回应，只是晚了两秒。'},
-    {title:'追光与对拍',rule:'orbit',description:'留住过去，跟随移动的现在。共鸣后，在门环的亮拍点击。',
+    {title:'月下的回信',arcana:'XVIII · 月亮',rule:'code',description:'依次点击月亮 → 星星 → 月亮 → 太阳。两秒后的回声会替你叩门。',
+      switches:[{x:330,y:365,name:'星星',label:'XVII · 星星'},{x:590,y:285,name:'月亮',label:'XVIII · 月亮'},{x:820,y:390,name:'太阳',label:'XIX · 太阳'}],exit:{x:1030,y:300},code:[1,0,1,2],
+      hint:'依次点击月亮、星星、月亮、太阳，每次等光点靠近再点。只有两秒后重播的点击才算输入；多点或点错会清空暗号，等旧回声结束再重输。单纯停留不会点亮。',done:'月光里，传来你的回信。',after:'星星记住了那句暗号，太阳在回声尽头等你。'},
+    {title:'追光与对拍',arcana:'XVII · 星星',rule:'orbit',description:'留住过去，跟随移动的现在。共鸣后，在门环的亮拍点击。',
       switches:[{x:400,y:355,label:'现 · 跟随',role:'now'},{x:800,y:370,label:'昔 · 留光',role:'echo'}],exit:{x:970,y:250},orbit:{index:0,cx:400,cy:355,r:68,speed:.65},beat:{period:2.4,window:.65},
       hint:'先在右侧留光，再跟随左侧缓慢公转的机关。青白与暖金同时正确占位 0.55 秒就保留共鸣。随后去出口，门环指针进入亮区时点击；错过拍子不会失败。',done:'终于，和自己合上了拍。',after:'追赶之后，记得等一等恰好的时刻。'},
-    {title:'恰好的余温',rule:'balance',description:'三盏灯都保持在刻度带内：35%—85%。太暗或太满，都无法共鸣。',
+    {title:'恰好的余温',arcana:'XIV · 节制',rule:'balance',description:'三盏灯都保持在刻度带内：35%—85%。太暗或太满，都无法共鸣。',
       switches:[{x:320,y:345,label:'第一盏'},{x:580,y:275,label:'第二盏'},{x:800,y:400,label:'第三盏'}],exit:{x:1020,y:290},
       hint:'短暂触碰各盏灯，让亮度进入外圈标出的 35%—85% 区间。影子也会充能，所以要预留余量；太满就离开等它衰减。三盏同时达标 0.4 秒后永久开门。',done:'光不必盛满，便足够温暖。',after:'掌握节奏，也包括懂得何时离开。'},
-    {title:'拨动光弦',rule:'beam',description:'影子守住锚点，你来转动光弦，依次穿过三枚棱晶。',
+    {title:'拨动光弦',arcana:'I · 魔术师',rule:'beam',description:'影子守住锚点，你来转动光弦，依次穿过三枚棱晶。',
       switches:[{x:300,y:360,label:'昔 · 光弦锚点',role:'echo'}],targets:[{x:520,y:280},{x:570,y:425},{x:640,y:330}],exit:{x:1030,y:400},
       hint:'在左侧锚点留光，再把自己移到第一枚棱晶后方，让两光点之间的直线穿过它约 0.25 秒；依次扫过第二、第三枚。棱晶按顺序编号，进度保留；影子离开可重新留光继续。',done:'距离，也可以奏出声音。',after:'彼此之间的牵连，是你拨动的那根弦。'},
-    {title:'夜的合奏',rule:'finale',description:'先输入乙 → 甲 → 乙，再用光弦点亮双晶，最后在亮拍叩门。',
-      switches:[{x:300,y:260,label:'甲 · 点击'},{x:550,y:245,label:'乙 · 点击'},{x:350,y:365,label:'昔 · 锚点',role:'echo'}],code:[1,0,1],targets:[{x:650,y:275},{x:650,y:455}],exit:{x:1000,y:340},beat:{period:2.8,window:.7},
-      hint:'先按乙、甲、乙点击，等待影子输入完成。然后在下方锚点留光，移到两枚棱晶后方，依次用光弦穿过它们约 0.3 秒。暗号和棱晶进度保留，最后在出口门环亮拍点击。',done:'所有的你，终于相遇。',after:'走过的时间，汇成了这一夜的光。'}
+    {title:'世界的回环',arcana:'XXI · 世界',rule:'finale',description:'先点击月亮 → 星星 → 月亮，再用光弦点亮双晶，最后在亮拍叩门。',
+      switches:[{x:300,y:260,name:'星星',label:'XVII · 星星'},{x:550,y:245,name:'月亮',label:'XVIII · 月亮'},{x:350,y:365,label:'昔 · 锚点',role:'echo'}],code:[1,0,1],targets:[{x:650,y:275},{x:650,y:455}],exit:{x:1000,y:340},beat:{period:2.8,window:.7},
+      hint:'先按月亮、星星、月亮点击，等待影子输入完成。然后在下方锚点留光，移到两枚棱晶后方，依次用光弦穿过它们约 0.3 秒。暗号和棱晶进度保留，最后在出口门环亮拍点击。',done:'所有的你，终于相遇。',after:'从愚者迈出的第一步，到世界温柔的回环，每一束光都是你。'}
   ];
   const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   class Timeline {
@@ -147,7 +147,7 @@
       if(this.level.beat&&this.latched)return '共鸣已保留。等待门环指针进入亮区，再点击。';
       if(r==='swap')return this.phase===0?'第一段：过去在左，你在右。':'第一段已保留。交换：过去在右，你在左。';
       if(r==='gate')return this.latched?'你已经穿过屏障。前往出口。':this.gateOpen?'光隙已打开，从中间穿过去。':'在左侧留光；等待暖金影子开闸，青白从中间穿行。';
-      if(r==='code'||(r==='finale'&&!this.codeDone))return this.codeError?'暗号不对，回声已清空。等旧回声结束再输入。':'回声输入 '+this.phase+' / '+this.level.code.length+'：'+this.level.code.map(n=>['甲','乙','丙'][n]).join(' → ')+'。请点击。';
+      if(r==='code'||(r==='finale'&&!this.codeDone))return this.codeError?'暗号不对，回声已清空。等旧回声结束再输入。':'回声输入 '+this.phase+' / '+this.level.code.length+'：'+this.level.code.map(n=>this.level.switches[n].name).join(' → ')+'。请点击。';
       if(r==='orbit')return '暖金守住右侧，青白跟随公转机关，共鸣 0.55 秒。';
       if(r==='balance')return '把三盏光调在刻度带内：'+this.energy.map(v=>Math.round(v*100)+'%').join(' / ')+'。影子也会充能。';
       if(r==='beam'||r==='finale')return '棱晶 '+this.crystal+' / '+this.level.targets.length+'。影子守锚点，你在目标后方，用光弦依次扫过。';

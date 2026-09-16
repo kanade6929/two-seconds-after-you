@@ -88,7 +88,7 @@
     $('chapterCount').textContent = `${String(index+1).padStart(2,'0')} / ${String(LEVELS.length).padStart(2,'0')}`;
     $('levelTitle').textContent = game.level.title; $('levelDescription').textContent = game.level.description;
     $('hint').textContent = game.level.hint; visible('hintButton', false);
-    $('footerText').textContent = '停留半秒，把微光留给过去。';
+    $('footerText').textContent = game.level.arcana;
     show('play'); updateStatus(); tone(330, .25);
   }
   function pause() { if (mode === 'play' || mode === 'reconnect') { pointer.down = false; show('paused'); } }
@@ -168,7 +168,15 @@
   $('retry').onclick = $('pauseRetry').onclick = () => start(game.index);
   $('failureRetry').onclick = () => start(game.index);
   $('pause').onclick = pause;
-  $('resume').onclick = () => { unlockAudio(); show('reconnect'); };
+  $('resume').onclick = () => {
+    if (!game || mode !== 'paused') return;
+    unlockAudio();
+    // Resume in one click. The old reconnect mode froze simulation until a
+    // second, easy-to-miss click, sometimes on a point outside the resized view.
+    // Keep the recorded position; the next mouse move eases away from it.
+    pointer = { ...game.point, down: false }; follower.reset(pointer);
+    clickTarget = null; pointerSeen = true; show('play');
+  };
   $('home').onclick = () => { show('title'); titleTimeline = new Timeline(); titleTime = 0; $('footerText').textContent = '一点过去，一点现在。'; };
   $('sound').onclick = () => { muted = !muted; controls(); persist(); if (!muted) { unlockAudio(); tone(440); } };
   $('motion').onclick = () => { reduced = !reduced; controls(); persist(); };
@@ -184,6 +192,7 @@
     LEVELS.forEach((level, i) => {
       const b = document.createElement('button'); b.className = 'level-choice'; b.disabled = i > unlocked;
       const name = document.createElement('strong'); name.textContent = `0${i + 1}　${level.title}`; name.style.fontWeight = '400';
+      const arcana = document.createElement('small'); arcana.className = 'arcana-name'; arcana.textContent = level.arcana; name.append(arcana);
       const status = document.createElement('span'); status.textContent = i > unlocked ? '尚未抵达' : completed.includes(i) ? '已完成 · 重温' : '开始';
       b.append(name, status); b.onclick = () => start(i); $('levelItems').append(b);
     });

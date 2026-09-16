@@ -10,6 +10,14 @@
       this.scale = Math.min(r.width / W, r.height / H);
       this.ox = (r.width - W * this.scale) / 2; this.oy = (r.height - H * this.scale) / 2;
       this.dpr = dpr;
+      // Match the CSS night sky inside the canvas as well: screen-composited
+      // light maps need an opaque backdrop or their black bounds show through.
+      const c = this.ctx, w = this.canvas.width, h = this.canvas.height;
+      this.skyRx = w * .72 * Math.SQRT2; this.skyRy = h * .52 * Math.SQRT2;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      this.sky = c.createRadialGradient(0, 0, 0, 0, 0, 1);
+      this.sky.addColorStop(0, '#152839'); this.sky.addColorStop(.42, '#0b1522'); this.sky.addColorStop(1, '#070c14');
+      c.setTransform(1, 0, 0, 1, 0, 0);
     }
     point(e) { const r = this.canvas.getBoundingClientRect(); return { x: (e.clientX - r.left - this.ox) / this.scale, y: (e.clientY - r.top - this.oy) / this.scale, down: e.buttons === 1 }; }
     circle(x, y, r, color, fill = false, width = 1) {
@@ -22,8 +30,36 @@
     path(points, color, width = 1, dash = []) {
       const c = this.ctx; c.beginPath(); points.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.strokeStyle = color; c.lineWidth = width; c.setLineDash(dash); c.stroke(); c.setLineDash([]);
     }
+    sigil(name, x, y, color, intensity = 0) {
+      // Tarot totems use straight strokes exclusively, including the moon.
+      const c = this.ctx;
+      const stroke = (pairs, width = 1.35) => this.path(pairs.map(([dx,dy]) => ({x:x+dx,y:y+dy})), color, width);
+      c.save(); c.lineCap = 'butt'; c.lineJoin = 'miter'; c.miterLimit = 2;
+      c.shadowColor = color; c.shadowBlur = intensity * 9 * this.scale;
+      if (name === '星星') {
+        stroke([[0,-22],[5,-6],[20,0],[5,6],[0,22],[-5,6],[-20,0],[-5,-6],[0,-22]]);
+        stroke([[-13,-13],[13,13]],.85); stroke([[13,-13],[-13,13]],.85);
+        stroke([[0,-6],[4,0],[0,6],[-4,0],[0,-6]],.9);
+      } else if (name === '月亮') {
+        stroke([[7,-22],[-8,-17],[-17,-5],[-17,7],[-7,19],[7,22],[-1,10],[-5,0],[-1,-10],[7,-22]]);
+        stroke([[13,-7],[16,0],[13,7],[10,0],[13,-7]],1);
+        stroke([[-23,0],[-20,0]],1);
+      } else if (name === '太阳') {
+        stroke([[0,-11],[11,0],[0,11],[-11,0],[0,-11]]);
+        stroke([[0,-5],[5,0],[0,5],[-5,0],[0,-5]],.8);
+        for (let i=0;i<8;i++) {
+          const a=i*Math.PI/4;
+          stroke([[Math.cos(a)*16,Math.sin(a)*16],[Math.cos(a)*24,Math.sin(a)*24]],i%2?1:1.4);
+        }
+      }
+      c.restore();
+    }
     base() {
-      const c = this.ctx; c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      const c = this.ctx; c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.shadowBlur = 0;
+      const w = this.canvas.width, h = this.canvas.height;
+      c.setTransform(this.skyRx, 0, 0, this.skyRy, w * .72, h * .48);
+      c.fillStyle = this.sky; c.fillRect(-w * .72 / this.skyRx, -h * .48 / this.skyRy, w / this.skyRx, h / this.skyRy);
       c.setTransform(this.dpr * this.scale, 0, 0, this.dpr * this.scale, this.dpr * this.ox, this.dpr * this.oy);
     }
     atmosphere(t, reduced) {
@@ -37,7 +73,7 @@
     }
     glow(p, color, t, reduced, alpha = 1, hollow = false) {
       const c = this.ctx, breath = reduced ? 1 : 1 + .10 * Math.sin(t * 1.45 + (hollow ? 1.4 : 0));
-      c.save(); c.globalAlpha *= alpha;
+      c.save(); c.globalAlpha *= Math.max(0, Math.min(1, alpha));
       const radius = 53 * breath, gradient = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
       gradient.addColorStop(0, color + '50'); gradient.addColorStop(.28, color + '19'); gradient.addColorStop(1, color + '00');
       this.circle(p.x, p.y, radius, gradient, true);
@@ -48,40 +84,85 @@
     }
     ribbon(timeline, start, end, color, opacity) {
       if (!timeline || end <= start) return;
-      const c = this.ctx, points = [], cadence = 1 / 45;
+      const points = [], cadence = 1 / 45;
       const first = timeline.at(start); if (first) points.push(first);
-      // Sampling is anchored to absolute game time, never the shifting array index.
-      for (let t = Math.ceil(start / cadence) * cadence; t < end; t += cadence) {
-        const p = timeline.at(t);
-        if (p && (!points.length || EchoCore.distance(points[points.length - 1], p) >= 1.6)) points.push(p);
+      // Keep every time-grid sample: distance decimation from the moving tail
+      // changes ALL retained vertices at once, making slow curves shimmer.
+      for (let tick = Math.floor(start / cadence) + 1; tick * cadence < end; tick++) {
+        const p = timeline.at(tick * cadence);
+        if (p) points.push(p);
       }
-      const last = timeline.at(end); if (last && (!points.length || EchoCore.distance(points[points.length-1],last)>.05)) points.push(last);
+      const last = timeline.at(end); if (last) points.push(last);
       if (points.length < 2) return;
-      const inheritedAlpha=c.globalAlpha;
-      c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
-      c.beginPath(); c.moveTo(points[0].x,points[0].y);
+      const pixelScale = this.dpr * this.scale, ox = this.dpr * this.ox, oy = this.dpr * this.oy;
+      const pad = 12 * pixelScale + 2;
+      const left = Math.max(0, Math.floor(Math.min(...points.map(p => p.x)) * pixelScale + ox - pad));
+      const top = Math.max(0, Math.floor(Math.min(...points.map(p => p.y)) * pixelScale + oy - pad));
+      const right = Math.min(this.canvas.width, Math.ceil(Math.max(...points.map(p => p.x)) * pixelScale + ox + pad));
+      const bottom = Math.min(this.canvas.height, Math.ceil(Math.max(...points.map(p => p.y)) * pixelScale + oy + pad));
+      if (right <= left || bottom <= top) return;
+      // An opaque, reusable light map lets 'lighten' take the maximum intensity
+      // at joins/self-crossings instead of accumulating translucent round caps.
+      // Black is neutral when this map is screened onto the actual night scene.
+      const createLayer = () => typeof OffscreenCanvas === 'function'
+        ? new OffscreenCanvas(this.canvas.width, this.canvas.height) : document.createElement('canvas');
+      if (!this.ribbonLayer) this.ribbonLayer = createLayer();
+      if (!this.ribbonMask) this.ribbonMask = createLayer();
+      const layer = this.ribbonLayer;
+      for (const surface of [layer, this.ribbonMask]) {
+        if (surface.width !== this.canvas.width) surface.width = this.canvas.width;
+        if (surface.height !== this.canvas.height) surface.height = this.canvas.height;
+      }
+      const c = layer.getContext('2d');
+      c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+      c.fillStyle = '#000000'; c.fillRect(left, top, right - left, bottom - top);
+      c.setTransform(pixelScale, 0, 0, pixelScale, ox, oy);
+      c.globalCompositeOperation = 'lighten'; c.lineCap = 'round'; c.lineJoin = 'round';
+      const fade = t => {
+        const u = Math.max(0, Math.min(1, (t - start) / (end - start)));
+        return u * u * (3 - 2 * u);
+      };
+      const rgb = [1,3,5].map(n => parseInt(color.slice(n,n+2),16));
+      const mask = this.ribbonMask.getContext('2d');
+      mask.setTransform(1,0,0,1,0,0); mask.clearRect(left,top,right-left,bottom-top);
+      mask.setTransform(pixelScale,0,0,pixelScale,ox,oy);
+      mask.globalCompositeOperation = 'source-over'; mask.lineCap = 'round'; mask.lineJoin = 'round';
+      mask.beginPath(); mask.moveTo(points[0].x,points[0].y);
       for (let i = 0; i < points.length - 1; i++) {
         const a = points[Math.max(0, i - 1)], b = points[i], d = points[i + 1], e = points[Math.min(points.length - 1, i + 2)];
         // Limited Catmull-Rom tangents preserve endpoints without corner spikes.
-        const len = Math.hypot(d.x - b.x, d.y - b.y), tangent = (x, y) => { const s = Math.min(1 / 6, len / (3 * (Math.hypot(x, y) || 1))); return [x * s, y * s]; };
+        const len = Math.hypot(d.x - b.x, d.y - b.y);
+        if (len < .001) continue; // Resting samples must not become luminous dots.
+        const tangent = (x, y) => { const s = Math.min(1 / 6, len / (3 * (Math.hypot(x, y) || 1))); return [x * s, y * s]; };
         const v = tangent(d.x - a.x, d.y - a.y), w = tangent(e.x - b.x, e.y - b.y);
+        c.beginPath(); c.moveTo(b.x, b.y);
         c.bezierCurveTo(b.x + v[0], b.y + v[1], d.x - w[0], d.y - w[1], d.x, d.y);
+        mask.bezierCurveTo(b.x + v[0], b.y + v[1], d.x - w[0], d.y - w[1], d.x, d.y);
+        // Local age interpolation never rotates/reverses a whole-trail gradient.
+        const gradient = c.createLinearGradient(b.x, b.y, d.x, d.y);
+        // Opaque RGB stores age. A wide color field keeps segment-cap AA
+        // outside the final ribbon, whose coverage is drawn as ONE path.
+        const shade = t => `rgb(${rgb.map(v => (v * fade(t)).toFixed(3)).join(',')})`;
+        gradient.addColorStop(0, shade(b.t)); gradient.addColorStop(1, shade(d.t));
+        c.strokeStyle = gradient; c.globalAlpha = 1; c.lineWidth = 20; c.stroke();
       }
-      // One uninterrupted path per pass. Segment caps never accumulate into beads.
-      const head=points[points.length-1], tail=points[0];
-      const gradient=c.createLinearGradient(tail.x,tail.y,head.x+.01,head.y+.01);
-      gradient.addColorStop(0,color+'00'); gradient.addColorStop(.22,color+'55'); gradient.addColorStop(1,color);
-      const freshness=Math.max(0,Math.min(1,(head.t-start)/(end-start)));
-      c.strokeStyle=gradient;
-      c.globalAlpha=inheritedAlpha*opacity*freshness*.06;c.lineWidth=9;c.stroke();
-      c.globalAlpha=inheritedAlpha*opacity*freshness*.13;c.lineWidth=4;c.stroke();
-      c.globalAlpha=inheritedAlpha*opacity*freshness;c.lineWidth=1.2;c.stroke();
-      c.restore();
+      mask.strokeStyle = '#ffffff';
+      for (const [width, alpha] of [[9,.06],[4,.13],[1.2,1]]) {
+        mask.globalAlpha = alpha; mask.lineWidth = width; mask.stroke();
+      }
+      c.setTransform(1,0,0,1,0,0); c.globalAlpha = 1; c.globalCompositeOperation = 'destination-in';
+      c.drawImage(this.ribbonMask,left,top,right-left,bottom-top,left,top,right-left,bottom-top);
+      const target = this.ctx;
+      target.save(); target.setTransform(1, 0, 0, 1, 0, 0);
+      target.globalAlpha *= Math.max(0, Math.min(1, opacity));
+      target.globalCompositeOperation = 'screen'; target.shadowBlur = 0;
+      target.drawImage(layer, left, top, right - left, bottom - top, left, top, right - left, bottom - top);
+      target.restore();
     }
     cursors(point, echo, timeline, reduced, t) {
       const c = this.ctx;
-      this.ribbon(timeline, t - (reduced ? .6 : 2), t, C.ink, .6);
-      this.ribbon(timeline, t - (reduced ? 2.4 : 3.1), t - 2, C.red, .5);
+      this.ribbon(timeline, t - (reduced ? .35 : 1.15), t, C.ink, .6);
+      this.ribbon(timeline, t - (reduced ? 2.25 : 2.6), t - 2, C.red, .5);
       if (echo) this.glow(echo, C.red, t, reduced, Math.min(1, Math.max(0, (t - 2) / .3)), true);
       if (point) this.glow(point, C.ink, t, reduced);
     }
@@ -217,8 +298,7 @@
         switches.forEach(s=>this.path([{x:s.x,y:s.y},{x:e.x,y:e.y}],doorColor,1));
       }
       if(l.code){
-        const names=['甲','乙','丙'];
-        this.text(l.code.map((v,i)=>i<game.phase?'✓':names[v]).join('   →   '),600,190,game.codeError?'#e9a19b':C.red,17);
+        this.text(l.code.map((v,i)=>i<game.phase?'✓':l.switches[v].name).join('   →   '),600,190,game.codeError?'#e9a19b':C.red,17);
       }
       switches.forEach((s, i) => {
         const a = active[i], light=this.lights[i], hue=this.mix(C.ink,C.red,light.echo),color=this.mix('#627b92',hue,light.level);
@@ -226,9 +306,10 @@
         this.orbitParticles(s,light.level,this.visualTime,reduced,hue);
         this.circle(s.x, s.y, 44, this.mix('#101c2a',this.mix('#172e35','#282322',light.echo),light.level), true);
         this.circle(s.x, s.y, 44, color, false, 1+light.level*.5);
-        this.circle(s.x, s.y, 34, C.line, false, 1);
+        if (s.name) this.sigil(s.name, s.x, s.y, color, light.level);
+        else this.circle(s.x, s.y, 34, C.line, false, 1);
         if(s.role)this.text(s.role==='now'?'现':'昔',s.x,s.y+5,s.role==='now'?C.ink:C.red,12);
-        else this.circle(s.x, s.y, 3, color, true);
+        else if(!s.name)this.circle(s.x, s.y, 3, color, true);
         // The remaining arc is the visible afterglow, decaying instead of snapping off.
         if(light.level>.01){c.beginPath();c.arc(s.x,s.y,39,-Math.PI/2,-Math.PI/2+Math.PI*2*light.level);c.strokeStyle=color;c.lineWidth=1.5;c.stroke();}
         if(this.chargeLight>.01){c.save();c.globalAlpha=this.chargeLight;c.beginPath();c.arc(s.x,s.y,49,-Math.PI/2,-Math.PI/2+Math.PI*2*this.chargeLight);c.strokeStyle=C.red;c.lineWidth=2;c.stroke();c.restore();}

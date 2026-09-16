@@ -50,3 +50,14 @@ test('progress keeps old unlocks while changing all eight puzzle rules',()=>{
  assert.equal(readProgress({unlocked:999,current:999,completed:[7,7,-1,'2']}).unlocked,7);
  assert.deepEqual(readProgress(null),{unlocked:0,completed:[],current:0,started:false});
 });
+test('arcana code names agree across switch labels, hints, descriptions, and status',()=>{
+ assert.equal(new Set(LEVELS.map(l=>l.arcana)).size,8);
+ for(const index of [3,7]){
+  const g=new Game(index),l=g.level;
+  assert.doesNotMatch(JSON.stringify(l),/[甲乙丙]/);
+  for(const n of l.code){
+   const s=l.switches[n];assert.ok(s.name);assert.ok(s.label.includes(s.name));
+   assert.ok(l.hint.includes(s.name));assert.ok(l.description.includes(s.name));assert.ok(g.status().includes(s.name));
+  }
+ }
+});

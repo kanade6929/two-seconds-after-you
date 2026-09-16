@@ -38,7 +38,7 @@ function harness(reduced = true, save = null) {
   vm.runInNewContext(fs.readFileSync(path.join(root,'app.js'),'utf8'),context);
   const advance = seconds=>{for(let i=0;i<Math.round(seconds*120);i++){clock+=1000/120;raf(clock);}};
   const event=(x,y,buttons=0)=>({clientX:x,clientY:y,buttons,button:0,target:{closest:()=>null}});
-  return {nodes,events,windowEvents,animations,advance,get snapshot(){return snapshot;},
+  return {nodes,events,windowEvents,animations,advance,document,get snapshot(){return snapshot;},
     move(x,y){events.pointermove(event(x,y));},click(x,y){events.pointerdown(event(x,y,1));events.pointermove(event(x,y,0));windowEvents.pointerup();},
     button:id=>nodes.get(id).onclick(),get stored(){return stored;}};
 }
@@ -47,9 +47,26 @@ test('page-wide movement, easing, pause/resume and reduced motion remain coheren
   assert.ok(h.snapshot.game.point.x < -79);assert.ok(h.snapshot.game.point.y>709);
   h.windowEvents.blur();h.advance(.1);const t=h.snapshot.game.t;assert.equal(h.snapshot.mode,'paused');
   h.advance(1);assert.equal(h.snapshot.game.t,t);
-  h.button('resume');h.advance(.1);assert.equal(h.snapshot.mode,'reconnect');
-  h.click(h.snapshot.game.point.x,h.snapshot.game.point.y);h.advance(.1);assert.equal(h.snapshot.mode,'play');
+  h.button('resume');h.advance(.1);assert.equal(h.snapshot.mode,'play');assert.ok(h.snapshot.game.t>t);
+  h.move(600,325);h.advance(.3);assert.ok(h.snapshot.game.point.x>599);
   assert.equal(h.animations.length,0);
+});
+test('resume is one click after resize, tab switch, and menu; pause time never enters replay',()=>{
+  for(const reduced of [true,false]){
+    const h=harness(reduced);h.button('start');h.move(1000,550);h.advance(.6);
+    for(const reason of ['resize','hidden','menu']){
+      const t=h.snapshot.game.t,p={...h.snapshot.game.point};
+      if(reason==='resize')h.windowEvents.resize();
+      if(reason==='hidden'){h.document.hidden=true;h.events.visibilitychange();}
+      if(reason==='menu'){h.button('levelsButton');h.button('closeLevels');}
+      h.advance(5);assert.equal(h.snapshot.game.t,t);
+      h.document.hidden=false;h.events.visibilitychange();h.button('resume');h.advance(.1);
+      assert.equal(h.snapshot.mode,'play');assert.ok(h.snapshot.game.t>t&&h.snapshot.game.t<t+.12);
+      assert.ok(Core.distance(h.snapshot.game.point,p)<.01,'continue click must not teleport the point');
+      assert.equal(h.nodes.get('pauseScreen').inert,true);
+      h.move(800,500);h.advance(.4);assert.ok(Core.distance(h.snapshot.game.point,{x:800,y:500})<1);
+    }
+  }
 });
 
 test('title continue migrates old three-chapter completion to chapter four',()=>{
@@ -76,7 +93,7 @@ test('coordinate transform covers every pixel for wide and tall viewports',()=>{
   for(const [width,height] of [[1920,1080],[1440,900],[800,900]]){
     const context={EchoCore:Core,window:{devicePixelRatio:1}};
     vm.runInNewContext(fs.readFileSync(path.join(root,'render.js'),'utf8'),context);
-    const r=new context.window.EchoRenderer({getContext:()=>({}),getBoundingClientRect:()=>({width,height,left:0,top:0})});
+    const r=new context.window.EchoRenderer({getContext:()=>({setTransform(){},createRadialGradient(){return{addColorStop(){}};}}),getBoundingClientRect:()=>({width,height,left:0,top:0})});
     for(const [x,y] of [[0,0],[width,height],[width/2,height/2]]){
       const p=r.point({clientX:x,clientY:y,buttons:0});
       assert.ok(Math.abs(p.x*r.scale+r.ox-x)<1e-6);assert.ok(Math.abs(p.y*r.scale+r.oy-y)<1e-6);
