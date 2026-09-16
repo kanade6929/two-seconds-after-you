@@ -37,7 +37,7 @@
       const key=[game.index,game.state.phase,r.width,r.height,document.getElementById('gameBottom').hidden].join(':');if(this.layoutKey===key&&this.layoutGame===game)return;this.layoutKey=key;this.layoutGame=game;
       const landscape=r.width>r.height,heading=document.getElementById('gameHeading').getBoundingClientRect(),bottom=document.getElementById('gameBottom').getBoundingClientRect();
       const left=landscape?248:14,top=landscape?68:Math.max(190,heading.bottom+14),width=r.width-left-14,height=Math.max(100,(landscape?r.height-126:bottom.top-12)-top);
-      const points=[...game.view.nodes,game.point,...(game.echo?[game.echo]:[]),...(game.view.targets?[{x:520,y:185},{x:650,y:185}]:[]),...(game.view.balance?[{x:318,y:260},{x:882,y:495}]:[])];const minX=Math.min(...points.map(p=>p.x))-90,maxX=Math.max(...points.map(p=>p.x))+90,minY=Math.min(...points.map(p=>p.y))-65,maxY=Math.max(...points.map(p=>p.y))+85;
+      const points=[...game.view.nodes,game.point,...(game.echo?[game.echo]:[]),...(game.view.moonMemory?[{x:560,y:160}]:[]),...(game.view.balance?[{x:318,y:260},{x:882,y:495}]:[])];const minX=Math.min(...points.map(p=>p.x))-90,maxX=Math.max(...points.map(p=>p.x))+90,minY=Math.min(...points.map(p=>p.y))-65,maxY=Math.max(...points.map(p=>p.y))+85;
       const spanX=Math.max(400,maxX-minX),spanY=Math.max(280,maxY-minY);this.scale=Math.min(width/spanX,height/spanY,1);this.ox=left+width/2-(minX+maxX)/2*this.scale;this.oy=top+height/2-(minY+maxY)/2*this.scale;
       this.sceneBounds={x:minX,y:minY,width:maxX-minX,height:maxY-minY};
     }
@@ -258,7 +258,7 @@
         for(let i=0;i<2;i++){const active=i===0?game.effect.left:game.effect.right;this.sunLights[i]=approach(this.sunLights[i],active?1:0,active?.14:.18);this.polygon(v.sun.receivers[i].x,v.sun.receivers[i].y,8,this.mix(C.line,i?C.ink:C.red,this.sunLights[i]),true);}
       }
       for(const star of v.stars)this.sigil('星星',star.x,star.y,C.red,0,.55);
-      if(v.targets){v.targets.forEach((target,i)=>{this.sigil(target,545+i*85,185,i===v.targetIndex?C.ink:C.red,i===v.targetIndex?.8:.15,.65);this.text(i<v.targetIndex?'已回应':i===v.targetIndex?'现在回应':'随后回应',545+i*85,216,C.muted,10);});this.path([{x:574,y:185},{x:601,y:185},{x:595,y:181}],C.line);}
+      if(v.moonMemory){const memory=v.moonMemory;if(memory.concealed){this.polygon(560,160,16,C.line);this.text('凭记忆选择',560,191,C.muted,11);}else{this.sigil(memory.target,560,160,C.ink,.55,.7);this.text('记住这一枚',560,191,C.ink,11);}}
       for(let i=0;i<v.nodes.length;i++){
         const n=v.nodes[i],echo=n.role==='echo'||n.role!=='now'&&R.nodeContains(game.echo,n,R.RELEASE_RADIUS);
         const active=!!n.active;

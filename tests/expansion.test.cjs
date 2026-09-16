@@ -38,10 +38,19 @@ test('each star map has a unique simultaneous chord, including reversed final ro
  const d=driver(4),g=d.g;d.move({x:415,y:395},3);d.until(()=>g.open,{x:735,y:338});assert.deepEqual(g.effect.chord,[R.starLeft[1],R.starRight[1]]);assert.equal(g.view.clickable,true);d.click();assert.equal(g.state.phase,1);
  const reversed=driver(4,{phase:3});reversed.move(R.starLeft[0],3);reversed.move(R.starRight[1],2);reversed.click();assert.equal(reversed.g.won,false);
 });
-test('moon requires two ordered true symbols during continuous reveal; wrong or expired reveal resets local order',()=>{
- const d=driver(5),g=d.g;d.tap(R.moonOptions[2]);assert.equal(g.state.sequence,0);d.move(R.moonWell,3);d.until(()=>g.open,R.moonOptions[2]);d.click();assert.equal(g.state.sequence,1);
- d.move(R.moonOptions[1],.5);d.click();assert.equal(g.state.phase,0);assert.equal(g.state.sequence,0);
- d.move(R.moonWell,3);d.until(()=>g.open,R.moonOptions[2]);d.click();d.move(R.moonOptions[2],2);assert.equal(g.state.sequence,0);assert.equal(g.view.clickable,false);
+test('moon shows one memory target only before activation and one correct click advances each round',()=>{
+ const d=driver(5),g=d.g;assert.equal(g.view.moonMemory.target,'星星');assert.equal(g.view.moonMemory.concealed,false);
+ d.tap(R.moonOptions[2]);assert.equal(g.state.phase,0);d.move(R.moonWell,3);assert.equal(g.view.moonMemory.target,null);assert.equal(g.view.moonMemory.concealed,true);
+ d.until(()=>g.open,R.moonOptions[2]);d.click();assert.equal(g.state.phase,1);assert.equal(g.view.moonMemory.target,'太阳');assert.equal(g.won,false);
+ assert.equal(solve(d,5).won,true);
+});
+
+test('moon wrong choices have the same click cue, but do not advance; expired activation cannot be clicked',()=>{
+ const d=driver(5),g=d.g;d.move(R.moonWell,3);d.until(()=>g.open,R.moonOptions[0]);
+ assert.equal(g.view.clickable,true);assert.equal(g.view.actionLabel,'确认选择');assert.deepEqual(g.view.actionPoint,R.moonOptions[0]);
+ assert.deepEqual(g.view.nodes.filter(n=>n.exit).map(n=>n.id),['choice0']);d.click();assert.equal(g.state.phase,0);assert.ok(g.state.error>0);assert.equal(g.view.moonMemory.target,null);
+ d.move(R.moonOptions[0],2.3);assert.equal(g.view.moonMemory.target,'星星');assert.equal(g.open,false);d.click();assert.equal(g.state.phase,0);
+ d.move(R.moonWell,3);d.until(()=>g.open,R.moonOptions[2]);assert.equal(g.view.actionLabel,'确认选择');d.click();assert.equal(g.state.phase,1);
 });
 test('sun requires actual unobstructed stamp rays and cannot tunnel through walls',()=>{
  for(let phase=0;phase<3;phase++){const m=R.sunLayout(phase);assert.equal(R.sunVisibility(m.pads[0],0,m),true);assert.equal(R.sunVisibility(m.pads[0],1,m),false);assert.equal(R.sunVisibility(m.pads[1],1,m),true);}

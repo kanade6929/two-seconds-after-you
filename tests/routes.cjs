@@ -18,7 +18,7 @@ function solvePuzzle(d,index){const g=d.g;
  if(index===4)for(let phase=g.state.phase;phase<4;phase++){const m=R.starLayout(phase);d.move(m.reversed?m.b:m.a,3);d.until(()=>g.open,m.reversed?m.a:m.b);d.click();}
  if(index===5)for(let phase=g.state.phase;phase<3;phase++){
   d.move(R.moonWell,3);
-  for(let seq=0;seq<2;seq++){const p=R.moonOptions[R.moonMaps[phase].indexOf(R.moonTargets[phase][seq])];d.until(()=>g.open,p);d.click();}
+  const p=R.moonOptions[R.moonMaps[phase].indexOf(R.moonTargets[phase])];d.until(()=>g.open,p);d.click();
  }
  if(index===6)for(let phase=g.state.phase;phase<3;phase++){
   const m=R.sunLayout(phase);d.move({x:780,y:490},2);d.move({x:400,y:490},2);d.move(m.pads[0],3);

@@ -119,3 +119,9 @@ test('mobile pixel adaptation requires sustained pressure and never moves logica
  for(let i=0;i<30;i++)r.adapt(33,12,true);assert.equal(r.dpr,1.75);assert.equal(r.scale,.6);assert.equal(r.ox,20);assert.equal(r.oy,100);
  r.adapt(1000,50,true);assert.equal(r.pressure,0);
 });
+
+test('moon renderer never draws the memory answer at its header while the well is active',()=>{
+ const {driver}=require('./routes.cjs'),d=driver(5),{r}=renderer(),draws=[];r.sigil=(name,x,y)=>draws.push({name,x,y});
+ r.game(d.g,'play',false);assert.deepEqual(draws.filter(p=>p.y===160),[{name:'星星',x:560,y:160}]);
+ draws.length=0;d.move(Core.Rules.moonWell,3);r.game(d.g,'play',false);assert.equal(draws.filter(p=>p.y===160).length,0);
+});

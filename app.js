@@ -53,7 +53,7 @@
   function home(){checkpoint();titleTimeline=new Timeline();titleTime=0;show('title');controls();}
   function retry(){if(game)enter(game.index,game.checkpoint());}
   function updateStatus(){
-    const status=game.view.clickable?game.view.actionLabel+' · 两光仍需保持合作。':game.status(),phase=`第 ${game.state.phase+1} 阵 / ${game.level.phases}`;
+    const status=game.view.clickable&&!game.state.error?game.view.actionLabel+' · 两光仍需保持合作。':game.status(),phase=`第 ${game.state.phase+1} 阵 / ${game.level.phases}`;
     if($('status').textContent!==status)$('status').textContent=status;
     if($('phaseLabel').textContent!==phase)$('phaseLabel').textContent=phase;
     visible('hintButton',game.t-game.progressAt>=25);
