@@ -11,3 +11,15 @@ test('star maps have one exact candidate chord and both targets must share it',(
 test('moon click before reveal and wrong pattern cannot advance; repeat observation allowed',()=>{const d=driver(5),g=d.g;d.tap(R.moonOptions[2]);assert.equal(g.state.phase,0);d.move(R.moonWell,3);d.move(R.moonOptions[0],1.3);g.update(0,g.point,true);assert.equal(g.state.phase,0);assert.ok(g.state.error>0);d.move(R.moonWell,3);d.move(R.moonOptions[2],1.3);g.update(0,g.point,true);assert.equal(g.state.phase,1);});
 test('sun masks block real rays and continuous movement cannot tunnel through wall',()=>{for(let phase=0;phase<2;phase++){const m=R.sunLayout(phase);assert.equal(R.sunVisibility(m.pads[0],0,m),true);assert.equal(R.sunVisibility(m.pads[0],1,m),false);assert.equal(R.sunVisibility(m.pads[1],1,m),true);}const g=new Game(6);g.update(STEP,{x:500,y:320});g.update(STEP,{x:590,y:320});assert.equal(g.blocked,true);assert.ok(g.point.x<530);});
 test('world refuses shortcut and retries attempt without exiting chapter',()=>{const d=driver(7);d.move(R.worldVertices[0],2);d.move({x:600,y:340},1);assert.equal(d.g.state.attempt,null);assert.equal(d.g.ready,false);assert.equal(d.g.won,false);});
+test('all eight final gates still require a real echo after faster movement',()=>{
+ for(let i=0;i<8;i++){
+  // Completed puzzle is a legitimate refresh checkpoint, never a powered gate.
+  const d=driver(i,{phase:LEVELS[i].phases}),g=d.g;
+  d.move(g.level.exit,1.8);for(let n=0;n<20;n++)g.update(0,g.point,true);
+  assert.equal(g.won,false,LEVELS[i].title+' solo/repeated clicks');
+  d.move(g.level.seal,3);d.move(g.level.exit,1.5);assert.equal(g.open,true);
+  d.move(g.level.exit,1);assert.equal(g.open,false);assert.equal(g.exitHold,0);
+  g.update(0,g.point,true);assert.equal(g.won,false,LEVELS[i].title+' residual glow');
+  d.exit();assert.equal(g.won,true,LEVELS[i].title+' valid handoff');
+ }
+});

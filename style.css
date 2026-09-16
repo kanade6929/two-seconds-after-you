@@ -3,8 +3,10 @@
 
 *{box-sizing:border-box}
 body{margin:0;background:var(--night);color:var(--text);overflow:hidden}
-body.cursor-ready,body.cursor-ready *{cursor:none!important}
+body.cursor-ready.light-cursor:not(.touch-mode),body.cursor-ready.light-cursor:not(.touch-mode) *{cursor:none!important}
 button,input,textarea{font:inherit}
+button:not(:disabled){cursor:pointer}
+button:disabled{cursor:not-allowed}
 button{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:44px;padding:10px 17px;border:1px solid var(--line);border-radius:0;background:#101c2b;color:var(--text);letter-spacing:.06em;transition:background-color .22s,color .22s,border-color .22s,box-shadow .22s,transform .22s var(--ease);isolation:isolate}
 button::after{content:"";position:absolute;width:5px;height:5px;right:3px;bottom:3px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;opacity:.4;pointer-events:none}
 button.virtual-hover,button:focus-visible{color:var(--cyan);border-color:var(--cyan);background:#1b3441;box-shadow:0 3px 22px #070c1466}
@@ -13,6 +15,11 @@ button:disabled{opacity:.4;color:var(--muted);transform:none;box-shadow:none}
 button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--gold);outline-offset:4px}
 button.primary{background:#213a42;border-color:#87b6b7;color:#e1fffa}
 .primary.virtual-hover{background:#30525a}
+@media(hover:hover){
+body:not(.light-cursor) button:not(:disabled):hover{color:var(--cyan);border-color:var(--cyan);background:#1b3441;box-shadow:0 3px 22px #070c1466}
+body:not(.light-cursor) .primary:not(:disabled):hover{background:#30525a}
+body:not(.light-cursor) button:not(:disabled):active{transform:translateY(1px);background:#284952}
+}
 svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;flex-shrink:0;pointer-events:none}
 button>*{pointer-events:none}
 h1,h2,p{margin:0}
@@ -80,7 +87,7 @@ footer{position:fixed;z-index:2;left:30px;right:30px;bottom:18px;display:flex;ju
 .legend .echo{background:var(--gold)}
 #virtualCursor{display:none;position:fixed;left:0;top:0;width:64px;height:64px;margin:-32px 0 0 -32px;z-index:2147483647;pointer-events:none;border-radius:50%;background:radial-gradient(circle,#b8eee825,transparent 67%);will-change:transform,opacity}
 #virtualCursor i{position:absolute;left:28px;top:28px;width:8px;height:8px;background:#d9fff9;border-radius:50%;box-shadow:0 0 14px #b8eee8,0 0 30px #b8eee855;transition:transform .15s}
-body.cursor-ready #virtualCursor{display:block}
+body.cursor-ready.light-cursor #virtualCursor{display:block}
 #virtualCursor.down i{transform:scale(1.375)}
 .community-screen{overflow:auto;padding:100px 20px 70px}
 .community-panel{width:min(710px,90vw);margin:auto}
@@ -120,7 +127,7 @@ form button{justify-self:start;margin:7px 0 16px}
 .touch-mode button:active{background:#30525a;color:var(--cyan);border-color:var(--cyan)}
 .touch-mode #canvas{touch-action:none}
 .touch-mode #virtualCursor{display:none}
-.touch-mode.touch-playing #virtualCursor{display:block}
+.touch-mode.light-cursor #virtualCursor{display:block}
 .touch-mode #app{min-height:0}
 .touch-mode .topbar{top:calc(10px + env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));right:max(14px,env(safe-area-inset-right));gap:8px}
 .touch-mode .topbar button{min-width:44px;min-height:44px;padding:9px;font-size:13px}

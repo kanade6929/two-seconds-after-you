@@ -12,7 +12,7 @@
 
 本地双击 `index.html`，或运行 `node server.cjs` 后打开 http://127.0.0.1:4173 。无需安装 npm 依赖。
 
-- PC：青色光点代替鼠标，整个页面同样限速。按钮也按**青色点的位置**响应，不会等它到达后补触发提前点击。Tab / Enter 可操作按钮，Esc 暂停。
+- PC：主页、选关、暂停、过关和留言菜单使用系统鼠标；进入关卡后由青色光点代替鼠标，关内按钮也按**青色点的位置**响应，不会补触发提前点击。光点上限 420 单位/秒，加速度上限 1600 单位/秒²，保留缓动防抖。Tab / Enter 可操作按钮，Esc 暂停。
 - 手机：菜单直接轻触。关内在底部「光域」滑动移动，或轻触场景设置目的地；青色点仍按相同速度缓动前往。点击右侧「确认」操作折印、真纹或出口；节制关按住确认注能。抬手不会让光点回弹。
 - 暖金影子准确重复两秒前的位置及按下状态；停留多久，它就停留多久，不会永久接手。
 - 每关最终门印只接受影子连续守位 0.4 秒。当前光点到出口停稳 0.25 秒，再确认。占位失效即关门，余光不算供能。
@@ -53,7 +53,7 @@
 基础测试：`node --test tests/*.test.cjs`。可选 `ECHO_CANVAS_MODULE` 指向已安装的 `@napi-rs/canvas`，启用 4 项像素回归。浏览器测试设置 `ECHO_PLAYWRIGHT_MODULE` 指向 Playwright 后运行：
 
 ```text
-node tests/browser-check.cjs chrome msedge chrome-mobile
+node tests/browser-check.cjs chrome msedge chrome-mobile chrome-mobile-landscape
 node tests/browser-regression.cjs
 ```
 

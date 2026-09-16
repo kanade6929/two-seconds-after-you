@@ -5,9 +5,9 @@
   function read(key){try{return JSON.parse(localStorage.getItem(key))||{};}catch{return {};}}
   const old=read('two-seconds-after-you.v1'),saved=read(saveKey),progress=readProgress(saved);
   let muted=(saved.muted??old.muted)===true,reduced=saved.reduced??old.reduced??window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let mode='title',game=null,raw={x:600,y:540,down:false},seen=false,inside=true,down=false,pressed=null,hovered=null,dispatching=false;
+  let mode='title',game=null,raw={x:600,y:540,down:false},seen=false,inside=true,down=false,pressed=null,hovered=null,dispatching=false,mouseGestureIsLight=false;
   const follower=new Follower(raw),cursor=$('virtualCursor');
-  let last=performance.now(),accumulator=0,titleTime=0,titleTimeline=new Timeline(),celebration=0,resumeAge=0,resumePlaced=false,returnMode='title',hintTier=0,selectionAnchor=null;
+  let last=performance.now(),accumulator=0,titleTime=0,titleTimeline=new Timeline(),celebration=0,resumeAge=0,resumePlaced=false,returnMode='title',hintTier=0;
   let audio=null,lastRevision=0;const transitions=new Map();
   let touchMode=window.matchMedia('(pointer: coarse)').matches,touchDrag=null,touchHoldId=null;document.body.classList.toggle('touch-mode',touchMode);
   function icon(el,name){el.prepend(ArcanaSymbols.svg(name,document));}
@@ -31,8 +31,10 @@
     $('continueGame').disabled=!progress.started;$('continueLabel').textContent=progress.started?'继续 · '+LEVELS[progress.current].title:'继续旅程';
     if(reduced)for(const[id,a]of transitions){a.cancel();$(id).hidden=$(id).dataset.visible!=='true';transitions.delete(id);}
   }
+  function lightCursor(){return ['play','resuming','celebrate'].includes(mode);}
   function show(next){
     mode=next;down=false;touchDrag=null;touchHoldId=null;pressed?.classList.remove('virtual-down');pressed=null;
+    hovered?.classList.remove('virtual-hover');hovered=null;document.body.classList.toggle('light-cursor',lightCursor());
     const mapping={titleScreen:'title',pauseScreen:'paused',completeScreen:'complete',endingScreen:'ending',levelMenu:'menu',community:'community'};
     for(const[id,m]of Object.entries(mapping))visible(id,mode===m);
     visible('gameHeading',!!game&&['play','paused','resuming','celebrate','complete'].includes(mode));visible('gameBottom',mode==='play');visible('hint',false);
@@ -67,7 +69,7 @@
     if(touchMode&&mode==='play'&&renderer.sceneBounds){const b=renderer.sceneBounds;raw.x=Math.max(b.x+8,Math.min(b.x+b.width-8,raw.x));raw.y=Math.max(b.y+8,Math.min(b.y+b.height-8,raw.y));}
     const p=follower.update(STEP,{...raw,down});
     if(mode==='resuming'){
-      resumeAge+=STEP;if(resumeAge>=.12&&!resumePlaced){resumePlaced=true;raw={...game.point,down:false};follower.reset(raw);}
+      resumeAge+=STEP;if(resumeAge>=.12&&!resumePlaced){resumePlaced=true;raw={...game.point,down:false};follower.reset(raw);document.body.classList.add('cursor-ready');}
       if(resumeAge>=.26)show('play');return;
     }
     if(mode==='play'){
@@ -80,8 +82,7 @@
   function updateCursor(){
     const p=cssPoint();cursor.style.transform=`translate3d(${p.x}px,${p.y}px,0)`;
     cursor.style.opacity=!inside?'0':mode==='resuming'?String(resumeAge<.12?1-resumeAge/.12:Math.min(1,(resumeAge-.12)/.14)):'1';cursor.classList.toggle('down',down||!!pressed);
-    const hit=touchMode?null:interactive();if(hit!==hovered){hovered?.classList.remove('virtual-hover');hovered=hit;hovered?.classList.add('virtual-hover');}
-    if(pressed?.matches('input,textarea')&&selectionAnchor!==null){const end=placeCaret(pressed,false);pressed.setSelectionRange(Math.min(selectionAnchor,end),Math.max(selectionAnchor,end),end<selectionAnchor?'backward':'forward');}
+    const hit=touchMode||mode!=='play'?null:interactive();if(hit!==hovered){hovered?.classList.remove('virtual-hover');hovered=hit;hovered?.classList.add('virtual-hover');}
   }
   function frame(now){
     const elapsed=Math.min(.1,Math.max(0,(now-last)/1000));last=now;
@@ -91,8 +92,9 @@
       updateCursor();
     }requestAnimationFrame(frame);
   }
-  // Native pointer clicks are intercepted. Only the visible, simulated point routes UI actions.
-  document.addEventListener('pointermove',e=>{if(e.pointerType==='touch'){if(touchDrag?.id===e.pointerId){if(touchDrag.pad){raw.x+=(e.clientX-touchDrag.x)/renderer.scale;raw.y+=(e.clientY-touchDrag.y)/renderer.scale;}else raw={...renderer.point(e),down:false};touchDrag.x=e.clientX;touchDrag.y=e.clientY;}return;}raw={...renderer.point(e),down:false};inside=true;if(!seen){seen=true;follower.reset(raw);document.body.classList.add('cursor-ready');}updateCursor();});
+  // Menus keep native pointer/focus/selection. Only a gameplay gesture is routed
+  // through the light; remember its origin even if pointerup opens a native menu.
+  document.addEventListener('pointermove',e=>{if(e.pointerType==='touch'){if(touchDrag?.id===e.pointerId){if(touchDrag.pad){raw.x+=(e.clientX-touchDrag.x)/renderer.scale;raw.y+=(e.clientY-touchDrag.y)/renderer.scale;}else raw={...renderer.point(e),down:false};touchDrag.x=e.clientX;touchDrag.y=e.clientY;}return;}raw={...renderer.point(e),down:false};inside=true;if(!seen){seen=true;if(!lightCursor())follower.reset(raw);document.body.classList.add('cursor-ready');}updateCursor();});
   document.addEventListener('pointerdown',e=>{
     if(e.pointerType==='touch'){
       if(!touchMode){touchMode=true;document.body.classList.add('touch-mode');visible('touchControls',mode==='play');document.body.classList.toggle('touch-playing',mode==='play');controls();}
@@ -101,28 +103,21 @@
       const pad=e.target.closest('#touchPad');if(mode==='play'&&(pad||e.target===$('canvas'))){e.preventDefault();e.target.setPointerCapture(e.pointerId);touchDrag={id:e.pointerId,pad:!!pad,x:e.clientX,y:e.clientY};if(!pad)raw={...renderer.point(e),down:false};return;}
       return;
     }
-    if(e.button!==0)return;if(!seen){raw=renderer.point(e);follower.reset(raw);seen=true;document.body.classList.add('cursor-ready');}
-    e.preventDefault();unlockAudio();const hit=interactive();
-    if(hit){pressed=hit;hit.classList.add('virtual-down');if(hit.matches('input,textarea')){hit.focus();selectionAnchor=placeCaret(hit);}return;}
+    if(e.button!==0)return;mouseGestureIsLight=lightCursor();unlockAudio();if(!mouseGestureIsLight)return;
+    if(!seen){raw=renderer.point(e);seen=true;document.body.classList.add('cursor-ready');}
+    e.preventDefault();if(mode!=='play')return;const hit=interactive();
+    if(hit){pressed=hit;hit.classList.add('virtual-down');return;}
     if(atCursor()?.closest('.scrim,.hint-panel,.topbar'))return;
     if(mode==='play'){down=true;const wasOpen=game.open;game.update(0,{...game.point,down:true},true);afterUpdate(wasOpen);}
   },true);
   window.addEventListener('pointerup',e=>{
     if(e.pointerType==='touch'){if(touchHoldId===e.pointerId){down=false;touchHoldId=null;}if(touchDrag?.id===e.pointerId)touchDrag=null;return;}
-    if(e.button!==0)return;down=false;const hit=interactive(),target=pressed;pressed?.classList.remove('virtual-down');pressed=null;selectionAnchor=null;
+    if(e.button!==0||!mouseGestureIsLight)return;down=false;const hit=mode==='play'?interactive():null,target=pressed;pressed?.classList.remove('virtual-down');pressed=null;
     if(target&&target===hit&&target.matches('button')){dispatching=true;try{target.click();}finally{dispatching=false;}}
   },true);
-  document.addEventListener('click',e=>{if(e.target.closest('#touchConfirm')){e.preventDefault();return;}if(!touchMode&&!dispatching&&e.detail!==0){e.preventDefault();e.stopImmediatePropagation();}},true);
-  window.addEventListener('pointercancel',()=>{touchDrag=null;touchHoldId=null;down=false;pressed=null;});
-  document.addEventListener('wheel',e=>{let el=atCursor();while(el&&el!==document.body){if(el.scrollHeight>el.clientHeight&&/auto|scroll/.test(getComputedStyle(el).overflowY)){e.preventDefault();el.scrollBy(0,e.deltaY);return;}el=el.parentElement;}},{passive:false});
-  function placeCaret(el,apply=true){
-    // Focus/caret follows the virtual cursor too; keyboard selection and IME remain native.
-    const p=cssPoint(),r=el.getBoundingClientRect(),s=getComputedStyle(el),c=renderer.ctx;c.save();c.font=s.font;
-    const x=p.x-r.left-parseFloat(s.paddingLeft)+el.scrollLeft,y=p.y-r.top-parseFloat(s.paddingTop)+el.scrollTop,w=el.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight),lineHeight=parseFloat(s.lineHeight)||24,targetRow=el.tagName==='TEXTAREA'?Math.max(0,Math.floor(y/lineHeight)):0;
-    let row=0,width=0,index=el.value.length;
-    for(let i=0;i<el.value.length;i++){const ch=el.value[i],cw=c.measureText(ch).width;if(ch==='\n'||width+cw>w&&el.tagName==='TEXTAREA'){if(row===targetRow){index=i;break;}row++;width=0;if(ch==='\n')continue;}if(row===targetRow&&width+cw/2>=x){index=i;break;}width+=cw;}
-    c.restore();if(apply)el.setSelectionRange(index,index);return index;
-  }
+  document.addEventListener('click',e=>{if(e.target.closest('#touchConfirm')){e.preventDefault();return;}if(!touchMode&&!dispatching&&e.detail!==0&&(mouseGestureIsLight||lightCursor())){e.preventDefault();e.stopImmediatePropagation();}},true);
+  window.addEventListener('pointercancel',()=>{touchDrag=null;touchHoldId=null;down=false;pressed?.classList.remove('virtual-down');pressed=null;});
+  document.addEventListener('wheel',e=>{if(touchMode||!lightCursor())return;let el=atCursor();while(el&&el!==document.body){if(el.scrollHeight>el.clientHeight&&/auto|scroll/.test(getComputedStyle(el).overflowY)){e.preventDefault();el.scrollBy(0,e.deltaY);return;}el=el.parentElement;}},{passive:false});
   document.documentElement.addEventListener('pointerleave',e=>{if(e.pointerType==='touch')return;inside=false;pause();});window.addEventListener('blur',pause);
   document.addEventListener('visibilitychange',()=>{if(document.hidden){pause();accumulator=0;}last=performance.now();});window.addEventListener('resize',()=>{renderer.resize();pause();});
   window.addEventListener('pagehide',checkpoint);

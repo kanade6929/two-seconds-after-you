@@ -1,11 +1,15 @@
 (function(root){
   'use strict';
   const Rules=typeof module!=='undefined'&&module.exports?require('./rules.js'):root.ArcanaRules;
-  const {LEVELS,dist:distance,near,clamp,segmentDistance}=Rules,STEP=1/120,DELAY=2,WIDTH=1200,HEIGHT=650,HOLD=.4,MAX_SPEED=360,MAX_ACCEL=1400;
+  const {LEVELS,dist:distance,near,clamp,segmentDistance}=Rules,STEP=1/120,DELAY=2,WIDTH=1200,HEIGHT=650,HOLD=.4,MAX_SPEED=420,MAX_ACCEL=1600;
   class Timeline{
     constructor(){this.samples=[];}
     add(t,p){const s={t,x:p.x,y:p.y,down:!!p.down},a=this.samples;if(a.length&&a[a.length-1].t===t)a[a.length-1]=s;else a.push(s);while(a.length>2&&a[1].t<t-3.2)a.shift();}
-    at(t){const a=this.samples;if(!a.length||t<a[0].t-1e-7)return null;if(t<=a[0].t)return {...a[0]};if(t>=a[a.length-1].t)return {...a[a.length-1]};let lo=0,hi=a.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(a[m].t<=t)lo=m;else hi=m;}const f=(t-a[lo].t)/(a[hi].t-a[lo].t);return {t,x:a[lo].x+(a[hi].x-a[lo].x)*f,y:a[lo].y+(a[hi].y-a[lo].y)*f,down:a[lo].down};}
+    at(t){const a=this.samples;if(!a.length||t<a[0].t-1e-7)return null;if(t<=a[0].t)return {...a[0]};if(t>=a[a.length-1].t)return {...a[a.length-1]};let lo=0,hi=a.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(a[m].t<=t)lo=m;else hi=m;}
+      // Fixed-step sums can land just before the exact two-second sample.
+      // Snap numerical dust only, so press/release is not replayed one tick late.
+      if(Math.abs(t-a[lo].t)<1e-7)return {...a[lo]};if(Math.abs(t-a[hi].t)<1e-7)return {...a[hi]};
+      const f=(t-a[lo].t)/(a[hi].t-a[lo].t);return {t,x:a[lo].x+(a[hi].x-a[lo].x)*f,y:a[lo].y+(a[hi].y-a[lo].y)*f,down:a[lo].down};}
   }
   class Follower{
     constructor(p){this.reset(p);}
