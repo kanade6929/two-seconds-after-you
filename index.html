@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090f19">
+  <meta name="description" content="和两秒前的自己合作。八个夜色里的鼠标谜题：交换、穿行、暗号、追光、余温与光弦。">
+  <title>两秒之后的你 · A little duet with yourself</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app">
+    <header class="topbar">
+      <button id="home" class="wordmark" aria-label="返回标题">两秒之后的你<span class="wordmark-dot"></span></button>
+      <nav id="settings" aria-label="游戏设置">
+        <button id="levelsButton" aria-expanded="false">章节 <span id="chapterCount">01 / 08</span></button>
+        <button id="sound" aria-pressed="false">声音 · 开</button>
+        <button id="motion" aria-pressed="false">动态 · 完整</button>
+      </nav>
+    </header>
+
+    <section id="stage" aria-label="两秒延迟光标解谜游戏">
+      <canvas id="canvas" aria-label="移动鼠标控制实心光点；空心光点重复两秒前的动作。停留在圆形开关，出口打开后点击出口。"></canvas>
+      <div id="titleScreen" class="screen title-screen">
+        <div class="title-copy">
+          <h1>两秒之后<span>的你<span class="title-period">。</span></span></h1>
+          <p class="english-title">A LITTLE DUET WITH YOURSELF</p>
+          <p class="intro">留一点时间，<br>让过去的你，接住现在。</p>
+          <button id="start" class="primary">开始这场合作 <span aria-hidden="true">↗</span></button>
+          <div class="title-actions"><button id="continueGame" disabled>继续游戏 · 尚无进度</button><button id="titleLevels">选择关卡</button></div>
+          <p class="micro">八个瞬间 · 只需鼠标 · 不用着急</p>
+        </div>
+        <div class="title-note"><span class="note-line"></span>移动鼠标，认识两秒前的你。</div>
+      </div>
+
+      <div id="gameHeading" class="game-heading" hidden>
+        <span id="levelNumber" class="level-number">01</span>
+        <div><h1 id="levelTitle">留一下</h1><p id="levelDescription"></p></div>
+      </div>
+      <div id="gameBottom" class="game-bottom" hidden>
+        <p id="status" role="status" aria-live="polite"></p>
+        <div><button id="hintButton" hidden aria-expanded="false">一点提示</button><button id="retry">重新来过</button><button id="pause">暂停</button></div>
+      </div>
+      <aside id="hint" hidden></aside>
+      <div id="pauseScreen" class="screen centered" hidden>
+        <div class="pause-card"><p class="pause-symbol" aria-hidden="true">Ⅱ</p><h2>时间，停在这里。</h2><p>过去的你会等你回来。</p><button id="resume" class="primary">继续</button><button id="pauseRetry" class="text-button">重新来过</button></div>
+      </div>
+      <div id="reconnect" class="reconnect-note" hidden>点击画面里的实心光点，从刚才的地方继续。</div>
+      <div id="failureScreen" class="screen centered" hidden>
+        <div class="failure-card"><div class="duet-mark" aria-hidden="true"><i></i><i></i></div><h2>只是，错过了一瞬。</h2><p>再留一束光给过去。<br>下一次，我们会相遇。</p><button id="failureRetry" class="primary">重试</button></div>
+      </div>
+      <div id="completeScreen" class="screen centered" hidden>
+        <div class="complete-card"><span class="completion-mark" aria-hidden="true"></span><p id="completeSmall" class="micro"></p><h2 id="completeTitle"></h2><p id="completeText"></p><button id="next" class="primary">下一个瞬间 <span aria-hidden="true">↗</span></button></div>
+      </div>
+      <div id="endingScreen" class="screen centered" hidden>
+        <div class="ending-card"><div class="duet-mark" aria-hidden="true"><i></i><i></i></div><h2>原来，你一直都在。</h2><p>每一次停留，<br>都成为了后来自己的依靠。</p><button id="again" class="primary">再合作一次 <span aria-hidden="true">↗</span></button><p class="micro">八段时间，一个你。</p></div>
+      </div>
+      <section id="levelMenu" class="level-menu" aria-label="选择章节" hidden><h2>八个瞬间</h2><div id="levelItems"></div><p>依次解锁新的时刻。已走过的章节，随时可以再来。</p><button id="closeLevels">返回</button></section>
+    </section>
+
+    <footer><div class="legend"><span><i class="dot now"></i>现在的你</span><span><i class="dot echo"></i>两秒前的你</span></div><p id="footerText">一点过去，一点现在。</p><span class="edition">EIGHT MOMENTS / 八章</span></footer>
+  </main>
+  <noscript>这个游戏需要启用 JavaScript。请使用 PC 版 Chrome 或 Edge 打开。</noscript>
+  <script src="core.js"></script><script src="render.js"></script><script src="app.js"></script>
+</body>
+</html>

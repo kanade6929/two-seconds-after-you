@@ -1,0 +1,8 @@
+.deployment.local.json
+node_modules/
+.netlify/
+.impeccable/
+*.log
+*token*
+.env*
+artifacts/
