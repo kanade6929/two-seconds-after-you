@@ -11,7 +11,7 @@ const source=process.env.ECHO_RENDER_REVISION
 function scene(width=1200,height=650,dpr=1){
   const surface=canvas.createCanvas(width,height);
   surface.getBoundingClientRect=()=>({left:0,top:0,width,height});
-  const sandbox={EchoCore:Core,window:{devicePixelRatio:dpr},OffscreenCanvas:class{constructor(w,h){return canvas.createCanvas(w,h);}}};
+  const sandbox={EchoCore:Core,ArcanaSymbols:require('../symbols.js'),window:{devicePixelRatio:dpr},OffscreenCanvas:class{constructor(w,h){return canvas.createCanvas(w,h);}}};
   vm.runInNewContext(source,sandbox);
   return {r:new sandbox.window.EchoRenderer(surface),surface};
 }

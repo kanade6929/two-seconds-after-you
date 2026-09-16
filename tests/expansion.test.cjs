@@ -1,63 +1,13 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {Game,STEP,LEVELS,readProgress}=require('../core.js');
-const {driver,solve}=require('./routes.cjs');
-for(let i=0;i<8;i++)test('chapter '+(i+1)+' solvable with real eased pointer input: '+LEVELS[i].title,()=>{assert.equal(solve(driver(i),i).won,true);});
-test('swap needs both directional phases, one stationary pair is insufficient',()=>{
- const d=driver(1),s=d.g.level.switches;d.move(s[0]);d.move(s[1],4);assert.equal(d.g.phase,1);assert.equal(d.g.open,false);
- d.move(s[0],2.5);assert.equal(d.g.phase,2);assert.equal(d.g.open,true);
-});
-test('closed gate blocks direct clicks and offscreen tunneling; echo opens center only',()=>{
- const d=driver(2),g=d.g;d.move(g.level.exit,1);assert.ok(g.point.x<610);assert.equal(g.latched,false);
- d.move({x:1100,y:-400},.5);assert.ok(g.point.x<610);assert.equal(g.won,false);
- d.move(g.level.switches[0],1);d.move({x:570,y:350},1.2);assert.equal(g.gateOpen,true);
- d.move({x:560,y:40},.25);d.move({x:900,y:40},.25);assert.ok(g.point.x<610);
-});
-test('gate full solution opens by echo, not by current light',()=>{
- const g=new Game(2);g.update(STEP,g.level.switches[0]);assert.equal(g.gateOpen,false);
- assert.equal(solve(driver(2),2).won,true);
-});
-test('code ignores occupancy; wrong echoed click resets; correct input is delayed two seconds',()=>{
- const d=driver(3),g=d.g,s=g.level.switches;for(const p of s)d.move(p,2.5);assert.equal(g.phase,0);
- d.tap(s[1]);assert.equal(g.phase,0);d.move({x:1000,y:540},2.1);assert.equal(g.phase,1);
- d.tap(s[2]);d.move({x:1000,y:540},2.1);assert.equal(g.phase,0);assert.ok(g.codeError>0);
- for(const i of g.level.code)d.tap(s[i]);d.move(g.level.exit,2.2);d.exit();assert.equal(g.won,true);
-});
-test('moving receiver requires tracking; rhythmic exit rejects off-beat clicks',()=>{
- const d=driver(4),g=d.g;d.move(g.level.switches[1],1.05);d.track(2.3);assert.equal(g.latched,true);
- d.move(g.level.exit,.4);while(g.open)d.move(g.level.exit,STEP);
- g.update(STEP,g.point,true);assert.equal(g.won,false);d.exit();assert.equal(g.won,true);
-});
-test('reservoir does not accept a full single lamp or overfilled values',()=>{
- const d=driver(5),g=d.g;d.move(g.level.switches[0],2);assert.equal(g.open,false);assert.equal(g.energy[0],1);
- const before=g.energy[0];d.move({x:50,y:600},.3);assert.ok(g.energy[0]<=before);assert.equal(g.latched,false);
- assert.equal(solve(driver(5),5).won,true);
-});
-test('beam ignores point visits without anchored echo and enforces crystal order',()=>{
- const d=driver(6),g=d.g;for(const p of g.level.targets)d.move(p,1);assert.equal(g.crystal,0);
- const anchor=g.level.switches[0],target=g.level.targets[2];d.move(anchor,1.1);
- d.move({x:anchor.x+(target.x-anchor.x)*1.7,y:anchor.y+(target.y-anchor.y)*1.7},2.2);
- assert.equal(g.crystal,0);assert.equal(g.latched,false);
-});
-test('finale cannot skip code by playing beam first',()=>{
- const d=driver(7),g=d.g,anchor=g.level.switches[2],target=g.level.targets[0];d.move(anchor,1.1);
- d.move({x:anchor.x+(target.x-anchor.x)*1.7,y:anchor.y+(target.y-anchor.y)*1.7},2.2);
- assert.equal(g.codeDone,false);assert.equal(g.crystal,0);assert.equal(g.open,false);
-});
-test('progress keeps old unlocks while changing all eight puzzle rules',()=>{
- assert.equal(LEVELS.length,8);assert.equal(new Set(LEVELS.map(l=>l.rule)).size,8);
- assert.deepEqual(readProgress({unlocked:2,completed:[0,1,2]}),{unlocked:3,completed:[0,1,2],current:3,started:true});
- assert.equal(readProgress({unlocked:999,current:999,completed:[7,7,-1,'2']}).unlocked,7);
- assert.deepEqual(readProgress(null),{unlocked:0,completed:[],current:0,started:false});
-});
-test('arcana code names agree across switch labels, hints, descriptions, and status',()=>{
- assert.equal(new Set(LEVELS.map(l=>l.arcana)).size,8);
- for(const index of [3,7]){
-  const g=new Game(index),l=g.level;
-  assert.doesNotMatch(JSON.stringify(l),/[甲乙丙]/);
-  for(const n of l.code){
-   const s=l.switches[n];assert.ok(s.name);assert.ok(s.label.includes(s.name));
-   assert.ok(l.hint.includes(s.name));assert.ok(l.description.includes(s.name));assert.ok(g.status().includes(s.name));
-  }
- }
-});
+const {Game,STEP,LEVELS,Rules:R}=require('../core.js');const {driver,solve}=require('./routes.cjs');
+for(let i=0;i<8;i++)test('real limited-speed input solves '+LEVELS[i].title,()=>assert.equal(solve(driver(i),i).won,true));
+test('eight genuinely different modules, final handoff distances and no worldly predictions',()=>{assert.equal(new Set(LEVELS.map(l=>l.id)).size,8);for(const l of LEVELS){const d=R.dist(l.seal,l.exit);assert.ok(d>=220&&d<=280);assert.equal(l.hint.length,2);assert.doesNotMatch(JSON.stringify(l),/[甲乙丙]/);}});
+test('fast sweeps and serial single-point visits cannot solve later puzzles',()=>{for(let i=1;i<8;i++){const d=driver(i);for(let n=0;n<80;n++)d.move({x:n%2?1100:100,y:250+n%3*120},.03);assert.equal(d.g.state.phase,0,LEVELS[i].title);assert.equal(d.g.won,false);}});
+test('magician beam must traverse both mirrors with physically correct reflection',()=>{assert.equal(R.traceMagic(0,[0,1]).hit,true);assert.equal(R.traceMagic(1,[1,1]).hit,true);for(const pair of [[1,0],[2,2],[0,0]])assert.equal(R.traceMagic(0,pair).hit,false);});
+test('lovers cannot stack on middle or use one side, phases clear old echo',()=>{const d=driver(2);d.move({x:600,y:350},4);assert.equal(d.g.state.phase,0);d.move(R.loversPairs[0][0],3);d.until(()=>d.g.state.phase===1,R.loversPairs[0][1]);assert.equal(d.g.echo,null);assert.equal(d.g.timeline.samples.length,1);d.move(R.loversPairs[0][1],2);assert.equal(d.g.state.phase,1);});
+test('temperance energy is conserved, release matters, solo pressing changes nothing',()=>{const d=driver(3);d.move({x:440,y:365},4,true);assert.equal(d.g.state.energy,.8);d.move({x:740,y:365},3);d.until(()=>d.g.effect.settled,{x:440,y:365});d.move({x:440,y:365},1,true);assert.ok(d.g.state.energy<.8);assert.equal(d.g.ready,false);assert.equal(d.g.view.energy.reduce((a,b)=>a+b),1);});
+test('star maps have one exact candidate chord and both targets must share it',()=>{for(let phase=0;phase<3;phase++){const g=new Game(4,{phase}),stars=g.view.stars;let good=0;for(const a of R.starLeft)for(const b of R.starRight)if(stars.every(s=>R.segmentDistance(s,a,b)<=12))good++;assert.equal(good,1);}});
+test('moon click before reveal and wrong pattern cannot advance; repeat observation allowed',()=>{const d=driver(5),g=d.g;d.tap(R.moonOptions[2]);assert.equal(g.state.phase,0);d.move(R.moonWell,3);d.move(R.moonOptions[0],1.3);g.update(0,g.point,true);assert.equal(g.state.phase,0);assert.ok(g.state.error>0);d.move(R.moonWell,3);d.move(R.moonOptions[2],1.3);g.update(0,g.point,true);assert.equal(g.state.phase,1);});
+test('sun masks block real rays and continuous movement cannot tunnel through wall',()=>{for(let phase=0;phase<2;phase++){const m=R.sunLayout(phase);assert.equal(R.sunVisibility(m.pads[0],0,m),true);assert.equal(R.sunVisibility(m.pads[0],1,m),false);assert.equal(R.sunVisibility(m.pads[1],1,m),true);}const g=new Game(6);g.update(STEP,{x:500,y:320});g.update(STEP,{x:590,y:320});assert.equal(g.blocked,true);assert.ok(g.point.x<530);});
+test('world refuses shortcut and retries attempt without exiting chapter',()=>{const d=driver(7);d.move(R.worldVertices[0],2);d.move({x:600,y:340},1);assert.equal(d.g.state.attempt,null);assert.equal(d.g.ready,false);assert.equal(d.g.won,false);});

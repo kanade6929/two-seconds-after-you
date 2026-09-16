@@ -1,203 +1,155 @@
-(function () {
+(function(){
   'use strict';
-  const { Game, Timeline, Follower, LEVELS, STEP, distance, readProgress } = EchoCore;
-  const $ = id => document.getElementById(id);
-  const renderer = new EchoRenderer($('canvas'));
-  const saveKey = 'two-seconds-after-you.v1';
-  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(saveKey)) || {}; } catch (_) { /* Offline/private browsing remains playable. */ }
-  let {unlocked,completed,current,started}=readProgress(saved);
-  let muted = saved.muted === true, reduced = typeof saved.reduced === 'boolean' ? saved.reduced : prefersReduced;
-  let mode = 'title', game = null, pointer = { x: 600, y: 540, down: false }, pointerSeen = false;
-  const follower = new Follower(pointer);
-  let titleTime = 0, titleTimeline = new Timeline(), last = performance.now(), accumulator = 0;
-  let pendingClick = 0, clickTarget = null, returnMode = 'title', hintShown = false, endingTime = 0;
-  let context = null, lastTone = -100;
-  let celebrationTime=0;
-  const transitions = new Map();
-  function visible(id, on) {
-    const el = $(id), previous = transitions.get(id);
-    if (el.dataset.visible === String(on)) return;
-    el.dataset.visible = String(on);
-    if (previous) { previous.cancel(); transitions.delete(id); }
-    el.style.pointerEvents = on ? '' : 'none';
-    el.inert = !on;
-    if (reduced || typeof el.animate !== 'function') { el.hidden = !on; return; }
-    if (on) el.hidden = false;
-    else if (el.hidden) return;
-    const isLayer = el.classList.contains('screen') || id === 'levelMenu';
-    const animation = el.animate(on
-      ? [{opacity:0,transform:`translateY(${isLayer ? 5 : 3}px)`},{opacity:1,transform:'translateY(0)'}]
-      : [{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-3px)'}],
-      {duration:on ? 420 : 170,easing:on ? 'cubic-bezier(.16,1,.3,1)' : 'ease-in',fill:'both'});
-    transitions.set(id, animation);
-    animation.finished.then(() => {
-      if (transitions.get(id) !== animation) return;
-      el.hidden = !on; animation.cancel(); transitions.delete(id);
-    }).catch(() => {});
+  const {Game,Timeline,Follower,LEVELS,STEP,readProgress}=EchoCore,$=id=>document.getElementById(id);
+  const renderer=new EchoRenderer($('canvas')),saveKey='two-seconds-after-you.arcana.v2';
+  function read(key){try{return JSON.parse(localStorage.getItem(key))||{};}catch{return {};}}
+  const old=read('two-seconds-after-you.v1'),saved=read(saveKey),progress=readProgress(saved);
+  let muted=(saved.muted??old.muted)===true,reduced=saved.reduced??old.reduced??window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let mode='title',game=null,raw={x:600,y:540,down:false},seen=false,inside=true,down=false,pressed=null,hovered=null,dispatching=false;
+  const follower=new Follower(raw),cursor=$('virtualCursor');
+  let last=performance.now(),accumulator=0,titleTime=0,titleTimeline=new Timeline(),celebration=0,resumeAge=0,resumePlaced=false,returnMode='title',hintTier=0,selectionAnchor=null;
+  let audio=null,lastRevision=0;const transitions=new Map();
+  let touchMode=window.matchMedia('(pointer: coarse)').matches,touchDrag=null,touchHoldId=null;document.body.classList.toggle('touch-mode',touchMode);
+  function icon(el,name){el.prepend(ArcanaSymbols.svg(name,document));}
+  document.querySelectorAll('[data-symbol]').forEach(el=>icon(el,el.dataset.symbol));
+  function visible(id,on){
+    const el=$(id);if(el.dataset.visible===String(on))return;el.dataset.visible=String(on);el.inert=!on;
+    transitions.get(id)?.cancel();transitions.delete(id);
+    if(reduced||!el.animate){el.hidden=!on;return;}
+    if(on)el.hidden=false;else if(el.hidden)return;
+    const a=el.animate(on?[{opacity:0,transform:'translateY(7px)'},{opacity:1,transform:'translateY(0)'}]:[{opacity:1},{opacity:0}],{duration:on?330:150,easing:'cubic-bezier(.16,1,.3,1)',fill:'both'});
+    transitions.set(id,a);a.finished.then(()=>{if(transitions.get(id)!==a)return;el.hidden=!on;a.cancel();transitions.delete(id);}).catch(()=>{});
   }
-
-  function persist() { try { localStorage.setItem(saveKey, JSON.stringify({ unlocked, completed, current, started, muted, reduced })); } catch (_) {} }
-  function unlockAudio() {
-    if (muted) return;
-    try { if (!context) { const A = window.AudioContext || window.webkitAudioContext; if (A) context = new A(); } if (context?.state === 'suspended') context.resume().catch(() => {}); } catch (_) {}
+  function persist(){try{localStorage.setItem(saveKey,JSON.stringify({...progress,muted,reduced}));}catch{/* Play remains available in private/restricted storage. */}}
+  function checkpoint(){if(game&&!game.won){progress.checkpoints[game.index]=game.checkpoint();persist();}}
+  function unlockAudio(){if(muted)return;try{if(!audio){const A=window.AudioContext||window.webkitAudioContext;if(A)audio=new A();}audio?.resume().catch(()=>{});}catch{}}
+  function tone(f=440,d=.3,volume=.025){if(muted||audio?.state!=='running')return;try{const o=audio.createOscillator(),g=audio.createGain(),t=audio.currentTime;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(volume,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(audio.destination);o.start(t);o.stop(t+d+.03);}catch{}}
+  function controls(){
+    $('inputNote').textContent=touchMode?'轻触与滑动 · 没有倒计时 · 不必急着抵达':'只需鼠标 · 没有倒计时 · 不必急着抵达';
+    $('soundLabel').textContent=muted?'声音 · 关':'声音 · 开';$('sound').setAttribute('aria-pressed',String(muted));
+    $('motionLabel').textContent=reduced?'动态 · 减少':'动态 · 完整';$('motion').setAttribute('aria-pressed',String(reduced));document.body.classList.toggle('reduced',reduced);
+    $('continueGame').disabled=!progress.started;$('continueLabel').textContent=progress.started?'继续 · '+LEVELS[progress.current].title:'继续旅程';
+    if(reduced)for(const[id,a]of transitions){a.cancel();$(id).hidden=$(id).dataset.visible!=='true';transitions.delete(id);}
   }
-  function tone(frequency = 440, duration = .3, gain = .035) {
-    if (muted || !context || context.state !== 'running') return;
-    try {
-      const o = context.createOscillator(), g = context.createGain(), t = context.currentTime;
-      o.type = 'sine'; o.frequency.value = frequency;
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + .018); g.gain.exponentialRampToValueAtTime(.0001, t + duration);
-      o.connect(g); g.connect(context.destination); o.start(t); o.stop(t + duration + .03);
-    } catch (_) {}
+  function show(next){
+    mode=next;down=false;touchDrag=null;touchHoldId=null;pressed?.classList.remove('virtual-down');pressed=null;
+    const mapping={titleScreen:'title',pauseScreen:'paused',completeScreen:'complete',endingScreen:'ending',levelMenu:'menu',community:'community'};
+    for(const[id,m]of Object.entries(mapping))visible(id,mode===m);
+    visible('gameHeading',!!game&&['play','paused','resuming','celebrate','complete'].includes(mode));visible('gameBottom',mode==='play');visible('hint',false);
+    visible('touchControls',touchMode&&mode==='play');document.body.classList.toggle('touch-playing',touchMode&&['play','resuming','paused','celebrate','complete'].includes(mode));
+    document.querySelector('.topbar').inert=['celebrate','resuming'].includes(mode);
+    $('footerText').textContent=mode==='title'?'一点过去，一点现在。':game?.level.theme||'';
   }
-  function controls() {
-    $('sound').textContent = muted ? '声音 · 关' : '声音 · 开'; $('sound').setAttribute('aria-pressed', String(muted));
-    $('motion').textContent = reduced ? '动态 · 减少' : '动态 · 完整'; $('motion').setAttribute('aria-pressed', String(reduced));
-    document.body.classList.toggle('reduced', reduced);
-    if (reduced) for (const [id, animation] of transitions) { $(id).hidden = $(id).dataset.visible !== 'true'; animation.cancel(); transitions.delete(id); }
-    $('start').firstChild.textContent = started ? '从第一束光开始 ' : '开始这场合作 ';
-    $('continueGame').disabled=!started;
-    $('continueGame').textContent=started?`继续游戏 · ${String(current+1).padStart(2,'0')} ${LEVELS[current].title}`:'继续游戏 · 尚无进度';
+  function enter(index,checkpointData={}){
+    checkpoint();unlockAudio();game=new Game(index,checkpointData);lastRevision=game.revision;
+    progress.current=index;progress.started=true;progress.checkpoints[index]=game.checkpoint();persist();controls();
+    $('levelNumber').textContent=game.level.roman;$('levelTitle').textContent=game.level.title;$('levelTheme').textContent=game.level.theme;$('levelTask').textContent=game.level.task;
+    hintTier=0;visible('hintButton',false);resumeAge=0;resumePlaced=false;show('resuming');
   }
-  function show(newMode) {
-    mode = newMode; pendingClick = 0; accumulator = 0; last = performance.now();
-    visible('titleScreen', mode === 'title');
-    visible('gameHeading', !!game && !['title', 'ending', 'menu', 'failed'].includes(mode));
-    visible('gameBottom', mode === 'play');
-    visible('pauseScreen', mode === 'paused');
-    visible('reconnect', mode === 'reconnect');
-    visible('completeScreen', mode === 'complete');
-    visible('endingScreen', mode === 'ending');
-    visible('failureScreen', mode === 'failed');
-    $('settings').hidden = mode === 'failed' || mode === 'celebrate';
-    $('home').hidden = mode === 'failed' || mode === 'celebrate';
-    visible('levelMenu', mode === 'menu');
-    $('stage').classList.toggle('playing', mode === 'play');
-    $('stage').classList.toggle('reconnecting', mode === 'reconnect');
-    document.body.classList.toggle('in-game', ['play', 'reconnect', 'title'].includes(mode));
-    visible('hint', false); hintShown = false; $('hintButton').setAttribute('aria-expanded', 'false');
-    $('levelsButton').setAttribute('aria-expanded', String(mode === 'menu'));
+  function pause(){if(['play','resuming'].includes(mode)){checkpoint();show('paused');}}
+  function resume(){if(mode!=='paused')return;unlockAudio();resumeAge=0;resumePlaced=false;show('resuming');}
+  function home(){checkpoint();titleTimeline=new Timeline();titleTime=0;show('title');controls();}
+  function retry(){if(game)enter(game.index,game.checkpoint());}
+  function updateStatus(){
+    $('status').textContent=game.status();$('phaseLabel').textContent=game.ready?'最后的交接':`第 ${game.state.phase+1} 阵 / ${game.level.phases}`;
+    visible('hintButton',game.t-game.progressAt>=25);
   }
-  function start(index) {
-    unlockAudio(); pointer.down = false; follower.reset(pointer); game = new Game(index, pointer); lastTone = -100;
-    pointer={...game.point};follower.reset(pointer);
-    current=index;started=true;persist();controls();
-    $('levelNumber').textContent = String(index + 1).padStart(2, '0');
-    $('chapterCount').textContent = `${String(index+1).padStart(2,'0')} / ${String(LEVELS.length).padStart(2,'0')}`;
-    $('levelTitle').textContent = game.level.title; $('levelDescription').textContent = game.level.description;
-    $('hint').textContent = game.level.hint; visible('hintButton', false);
-    $('footerText').textContent = game.level.arcana;
-    show('play'); updateStatus(); tone(330, .25);
+  function win(){
+    if(!progress.completed.includes(game.index))progress.completed.push(game.index);progress.unlocked=Math.max(progress.unlocked,Math.min(7,game.index+1));progress.current=Math.min(7,game.index+1);delete progress.checkpoints[game.index];persist();controls();
+    $('completeSigil').replaceChildren(ArcanaSymbols.svg(game.level.title,document));$('completeTitle').textContent=game.level.title+' · 已抵达';$('completeText').textContent=game.level.done;$('nextLabel').textContent=game.index===7?'与自己相逢':'翻开下一张牌';celebration=0;show('celebrate');tone(130.81,1,.04);tone(523.25,.9,.035);tone(783.99,1.1,.018);
   }
-  function pause() { if (mode === 'play' || mode === 'reconnect') { pointer.down = false; show('paused'); } }
-  function updateStatus() {
-    const text=game.status();
-    if ($('status').textContent !== text) {
-      $('status').textContent = text;
-      if (game.level.rule!=='balance' && !reduced && $('status').animate) { $('status').getAnimations().forEach(a => a.cancel()); $('status').animate([{opacity:.35},{opacity:1}],{duration:280,easing:'ease-out'}); }
+  function afterUpdate(wasOpen){
+    if(game.revision!==lastRevision){lastRevision=game.revision;checkpoint();hintTier=0;visible('hint',false);tone(659.25,.45);}
+    else if(!wasOpen&&game.open)tone(523.25,.3);
+    if(game.won)win();
+  }
+  function step(){
+    if(touchMode&&mode==='play'&&renderer.sceneBounds){const b=renderer.sceneBounds;raw.x=Math.max(b.x+8,Math.min(b.x+b.width-8,raw.x));raw.y=Math.max(b.y+8,Math.min(b.y+b.height-8,raw.y));}
+    const p=follower.update(STEP,{...raw,down});
+    if(mode==='resuming'){
+      resumeAge+=STEP;if(resumeAge>=.12&&!resumePlaced){resumePlaced=true;raw={...game.point,down:false};follower.reset(raw);}
+      if(resumeAge>=.26)show('play');return;
     }
-    visible('hintButton', game.t >= 25);
+    if(mode==='play'){
+      const wasOpen=game.open;game.update(STEP,p);if(game.blocked)follower.reset(game.point);afterUpdate(wasOpen);
+    }else if(mode==='title'){titleTime+=STEP;if(seen)titleTimeline.add(titleTime,p);}
   }
-  function win() {
-    if (!completed.includes(game.index)) completed.push(game.index);
-    unlocked = Math.max(unlocked, Math.min(LEVELS.length-1, game.index + 1)); current=Math.min(LEVELS.length-1,game.index+1);persist(); controls();
-    $('completeSmall').textContent = `第 ${game.index + 1} 个瞬间 / 共 ${LEVELS.length} 个`;
-    $('completeTitle').textContent = game.level.done; $('completeText').textContent = game.level.after;
-    $('next').firstChild.textContent = game.index === LEVELS.length-1 ? '走到最后 ' : '下一个瞬间 ';
-    celebrationTime=0;show('celebrate');tone(130.81,1.4,.045);tone(523.25,1.2,.04);tone(783.99,1.8,.025);
+  function cssPoint(){const r=$('canvas').getBoundingClientRect();return{x:r.left+renderer.ox+follower.x*renderer.scale,y:r.top+renderer.oy+follower.y*renderer.scale};}
+  function atCursor(){const p=cssPoint();return document.elementFromPoint(p.x,p.y);}
+  function interactive(){const el=atCursor()?.closest('button,input,textarea');return el&&!el.disabled&&!el.closest('[inert],[hidden]')?el:null;}
+  function updateCursor(){
+    const p=cssPoint();cursor.style.transform=`translate3d(${p.x}px,${p.y}px,0)`;
+    cursor.style.opacity=!inside?'0':mode==='resuming'?String(resumeAge<.12?1-resumeAge/.12:Math.min(1,(resumeAge-.12)/.14)):'1';cursor.classList.toggle('down',down||!!pressed);
+    const hit=touchMode?null:interactive();if(hit!==hovered){hovered?.classList.remove('virtual-hover');hovered=hit;hovered?.classList.add('virtual-hover');}
+    if(pressed?.matches('input,textarea')&&selectionAnchor!==null){const end=placeCaret(pressed,false);pressed.setSelectionRange(Math.min(selectionAnchor,end),Math.max(selectionAnchor,end),end<selectionAnchor?'backward':'forward');}
   }
-  function step() {
-    if (mode !== 'play') return;
-    const wasOpen = game.open, wasLatched = game.latched, wasActive = game.active.map(a => a.now || a.echo);
-    const smooth = follower.update(STEP, pointer, reduced);
-    pendingClick = Math.max(0, pendingClick - STEP);
-    const click = pendingClick > 0 && clickTarget && distance(smooth, clickTarget) < 18;
-    game.update(STEP, smooth, click); if (click) pendingClick = 0;
-    if(game.blocked)follower.reset(game.point);
-    if (!wasLatched && game.latched) tone(659.25, .5);
-    else if (!wasOpen && game.open) tone(523.25, .4);
-    else if (game.t - lastTone > .15 && game.active.some((a, i) => (a.now || a.echo) && !wasActive[i])) { tone(330, .18, .018); lastTone = game.t; }
-    if (game.won) win();
-    else if (game.failed) { show('failed'); tone(220, .7, .025); }
+  function frame(now){
+    const elapsed=Math.min(.1,Math.max(0,(now-last)/1000));last=now;
+    if(!document.hidden){renderer.layout(game&&!['title','menu','community','ending'].includes(mode)?game:null,touchMode);accumulator+=elapsed;while(accumulator>=STEP){step();accumulator-=STEP;}
+      if(['title','menu','community','ending'].includes(mode))renderer.title(null,titleTimeline.at(titleTime-2),titleTimeline,titleTime,reduced);
+      else if(game){renderer.game(game,mode,reduced,['paused','resuming'].includes(mode)?0:elapsed);if(mode==='play')updateStatus();if(mode==='celebrate'){celebration+=elapsed;renderer.ripple(game.level.exit,celebration,reduced);if(celebration>=(reduced?.4:1.1))show('complete');}}
+      updateCursor();
+    }requestAnimationFrame(frame);
   }
-  function frame(now) {
-    const elapsed = Math.min((now - last) / 1000, .25); last = now;
-    if(document.hidden){requestAnimationFrame(frame);return;}
-    if (mode === 'title') {
-      accumulator += elapsed;
-      while (accumulator >= STEP) { titleTime += STEP; const p = follower.update(STEP, pointer, reduced); if (pointerSeen) titleTimeline.add(titleTime, p); accumulator -= STEP; }
-      renderer.title(pointerSeen ? follower : null, titleTimeline.at(titleTime - 2), titleTimeline, titleTime, reduced);
-    } else if (game) {
-      if (mode === 'play') { accumulator += elapsed; while (accumulator >= STEP && mode === 'play') { step(); accumulator -= STEP; } updateStatus(); }
-      renderer.game(game, mode, reduced, ['paused','reconnect','menu'].includes(mode)?0:elapsed);
-      if(mode==='celebrate'){
-        if(!document.hidden)celebrationTime+=elapsed;
-        renderer.ripple(game.level.exit,celebrationTime,reduced);
-        if(celebrationTime>=(reduced?.45:2.6))show('complete');
-      }
-      if (mode === 'ending' && !reduced) {
-        endingTime += elapsed;
-        const separation = 32 * Math.max(0, 1 - endingTime / 2);
-        const dots = $('endingScreen').querySelectorAll('.duet-mark i'); dots[0].style.left = `${40 - separation / 2}px`; dots[1].style.left = `${40 + separation / 2}px`;
-      }
-    }
-    requestAnimationFrame(frame);
-  }
-  document.addEventListener('pointermove', e => {
-    if (mode === 'title' || mode === 'play') { pointer = renderer.point(e); pointerSeen = true; }
-  });
-  document.addEventListener('pointerdown', e => {
-    if (e.button !== 0 || e.target.closest('button, a')) return;
-    unlockAudio(); const p = renderer.point(e);
-    if (mode === 'reconnect') {
-      if (distance(p, game.point) <= 34) { pointer = { ...game.point, down: false }; follower.reset(pointer); show('play'); }
+  // Native pointer clicks are intercepted. Only the visible, simulated point routes UI actions.
+  document.addEventListener('pointermove',e=>{if(e.pointerType==='touch'){if(touchDrag?.id===e.pointerId){if(touchDrag.pad){raw.x+=(e.clientX-touchDrag.x)/renderer.scale;raw.y+=(e.clientY-touchDrag.y)/renderer.scale;}else raw={...renderer.point(e),down:false};touchDrag.x=e.clientX;touchDrag.y=e.clientY;}return;}raw={...renderer.point(e),down:false};inside=true;if(!seen){seen=true;follower.reset(raw);document.body.classList.add('cursor-ready');}updateCursor();});
+  document.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='touch'){
+      if(!touchMode){touchMode=true;document.body.classList.add('touch-mode');visible('touchControls',mode==='play');document.body.classList.toggle('touch-playing',mode==='play');controls();}
+      seen=true;inside=true;document.body.classList.add('cursor-ready');unlockAudio();
+      if(e.target.closest('#touchConfirm')){e.preventDefault();if(mode==='play'){touchHoldId=e.pointerId;down=true;const wasOpen=game.open;game.update(0,{...game.point,down:true},true);afterUpdate(wasOpen);}return;}
+      const pad=e.target.closest('#touchPad');if(mode==='play'&&(pad||e.target===$('canvas'))){e.preventDefault();e.target.setPointerCapture(e.pointerId);touchDrag={id:e.pointerId,pad:!!pad,x:e.clientX,y:e.clientY};if(!pad)raw={...renderer.point(e),down:false};return;}
       return;
     }
-    if (mode === 'play' || mode === 'title') { pointer = p; pointer.down = true; pointerSeen = true; pendingClick = mode === 'play' ? .25 : 0; clickTarget = p; }
-  });
-  window.addEventListener('pointerup', () => { pointer.down = false; });
-  document.documentElement.addEventListener('pointerleave', pause);
-  window.addEventListener('blur', pause);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
-  window.addEventListener('resize', () => { renderer.resize(); if (mode === 'play') pause(); });
-  window.addEventListener('keydown', e => { if (e.key === 'Escape') { if (mode === 'menu') closeMenu(); else pause(); } });
-  $('start').onclick = () => start(0);
-  $('continueGame').onclick = () => { if(started)start(current); };
-  $('retry').onclick = $('pauseRetry').onclick = () => start(game.index);
-  $('failureRetry').onclick = () => start(game.index);
-  $('pause').onclick = pause;
-  $('resume').onclick = () => {
-    if (!game || mode !== 'paused') return;
-    unlockAudio();
-    // Resume in one click. The old reconnect mode froze simulation until a
-    // second, easy-to-miss click, sometimes on a point outside the resized view.
-    // Keep the recorded position; the next mouse move eases away from it.
-    pointer = { ...game.point, down: false }; follower.reset(pointer);
-    clickTarget = null; pointerSeen = true; show('play');
+    if(e.button!==0)return;if(!seen){raw=renderer.point(e);follower.reset(raw);seen=true;document.body.classList.add('cursor-ready');}
+    e.preventDefault();unlockAudio();const hit=interactive();
+    if(hit){pressed=hit;hit.classList.add('virtual-down');if(hit.matches('input,textarea')){hit.focus();selectionAnchor=placeCaret(hit);}return;}
+    if(atCursor()?.closest('.scrim,.hint-panel,.topbar'))return;
+    if(mode==='play'){down=true;const wasOpen=game.open;game.update(0,{...game.point,down:true},true);afterUpdate(wasOpen);}
+  },true);
+  window.addEventListener('pointerup',e=>{
+    if(e.pointerType==='touch'){if(touchHoldId===e.pointerId){down=false;touchHoldId=null;}if(touchDrag?.id===e.pointerId)touchDrag=null;return;}
+    if(e.button!==0)return;down=false;const hit=interactive(),target=pressed;pressed?.classList.remove('virtual-down');pressed=null;selectionAnchor=null;
+    if(target&&target===hit&&target.matches('button')){dispatching=true;try{target.click();}finally{dispatching=false;}}
+  },true);
+  document.addEventListener('click',e=>{if(e.target.closest('#touchConfirm')){e.preventDefault();return;}if(!touchMode&&!dispatching&&e.detail!==0){e.preventDefault();e.stopImmediatePropagation();}},true);
+  window.addEventListener('pointercancel',()=>{touchDrag=null;touchHoldId=null;down=false;pressed=null;});
+  document.addEventListener('wheel',e=>{let el=atCursor();while(el&&el!==document.body){if(el.scrollHeight>el.clientHeight&&/auto|scroll/.test(getComputedStyle(el).overflowY)){e.preventDefault();el.scrollBy(0,e.deltaY);return;}el=el.parentElement;}},{passive:false});
+  function placeCaret(el,apply=true){
+    // Focus/caret follows the virtual cursor too; keyboard selection and IME remain native.
+    const p=cssPoint(),r=el.getBoundingClientRect(),s=getComputedStyle(el),c=renderer.ctx;c.save();c.font=s.font;
+    const x=p.x-r.left-parseFloat(s.paddingLeft)+el.scrollLeft,y=p.y-r.top-parseFloat(s.paddingTop)+el.scrollTop,w=el.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight),lineHeight=parseFloat(s.lineHeight)||24,targetRow=el.tagName==='TEXTAREA'?Math.max(0,Math.floor(y/lineHeight)):0;
+    let row=0,width=0,index=el.value.length;
+    for(let i=0;i<el.value.length;i++){const ch=el.value[i],cw=c.measureText(ch).width;if(ch==='\n'||width+cw>w&&el.tagName==='TEXTAREA'){if(row===targetRow){index=i;break;}row++;width=0;if(ch==='\n')continue;}if(row===targetRow&&width+cw/2>=x){index=i;break;}width+=cw;}
+    c.restore();if(apply)el.setSelectionRange(index,index);return index;
+  }
+  document.documentElement.addEventListener('pointerleave',e=>{if(e.pointerType==='touch')return;inside=false;pause();});window.addEventListener('blur',pause);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){pause();accumulator=0;}last=performance.now();});window.addEventListener('resize',()=>{renderer.resize();pause();});
+  window.addEventListener('pagehide',checkpoint);
+  window.addEventListener('keydown',e=>{if(e.isComposing)return;if(e.key==='Escape'){if(mode==='menu')closeMenu();else if(mode==='community')home();else if(!$('hint').hidden)visible('hint',false);else pause();}});
+  $('start').onclick=()=>enter(0);$('continueGame').onclick=()=>{if(progress.started)enter(progress.current,progress.checkpoints[progress.current]||{});};$('retry').onclick=$('pauseRetry').onclick=retry;$('pause').onclick=pause;$('resume').onclick=resume;
+  $('home').onclick=$('pauseHome').onclick=$('endingHome').onclick=home;
+  $('sound').onclick=()=>{muted=!muted;controls();persist();unlockAudio();tone();};$('motion').onclick=()=>{reduced=!reduced;controls();persist();};
+  $('hintButton').onclick=()=>{hintTier=0;showHint();};function showHint(){$('hintText').textContent=game.ready?'先在门印停约 1 秒，再走向出口。暖金守印 0.4 秒、青色在门前停稳 0.25 秒后点击。':game.level.hint[hintTier];$('hintNext').disabled=hintTier===1||game.ready;visible('hint',true);}
+  $('hintNext').onclick=()=>{hintTier=1;showHint();};$('closeHint').onclick=()=>visible('hint',false);
+  $('next').onclick=()=>{if(game.index<7)enter(game.index+1);else{$('collected').replaceChildren(...LEVELS.map(l=>ArcanaSymbols.svg(l.title,document)));show('ending');tone(261.63,1.4);}};$('again').onclick=()=>enter(0);
+  function closeMenu(){show(returnMode==='play'||returnMode==='resuming'?'paused':returnMode);}
+  $('closeLevels').onclick=closeMenu;
+  $('levelsButton').onclick=$('titleLevels').onclick=()=>{
+    if(mode==='menu'){closeMenu();return;}checkpoint();returnMode=mode;$('levelItems').replaceChildren();
+    LEVELS.forEach((l,i)=>{const b=document.createElement('button');b.className='chapter-card';b.disabled=i>progress.unlocked;const roman=document.createElement('span');roman.className='roman';roman.textContent=l.roman;const name=document.createElement('strong');name.textContent=l.title;const state=document.createElement('small');state.textContent=i>progress.unlocked?'尚未抵达':progress.completed.includes(i)?'已完成 · 重温':'翻开此牌';b.append(roman,ArcanaSymbols.svg(l.title,document),name,state);b.onclick=()=>enter(i);$('levelItems').append(b);});show('menu');
   };
-  $('home').onclick = () => { show('title'); titleTimeline = new Timeline(); titleTime = 0; $('footerText').textContent = '一点过去，一点现在。'; };
-  $('sound').onclick = () => { muted = !muted; controls(); persist(); if (!muted) { unlockAudio(); tone(440); } };
-  $('motion').onclick = () => { reduced = !reduced; controls(); persist(); };
-  $('hintButton').onclick = () => { hintShown = !hintShown; visible('hint', hintShown); $('hintButton').setAttribute('aria-expanded', String(hintShown)); };
-  $('next').onclick = () => { if (game.index < LEVELS.length-1) start(game.index + 1); else { endingTime = 0; show('ending'); $('footerText').textContent = '谢谢你，刚才的我。'; tone(261.63, 1.8); tone(392, 1.6, .02); } };
-  $('again').onclick = () => start(0);
-  function closeMenu() { show(returnMode === 'play' || returnMode === 'reconnect' ? 'paused' : returnMode); }
-  $('closeLevels').onclick = closeMenu;
-  $('levelsButton').onclick = $('titleLevels').onclick = () => {
-    if (mode === 'menu') { closeMenu(); return; }
-    returnMode = mode;
-    $('levelItems').replaceChildren();
-    LEVELS.forEach((level, i) => {
-      const b = document.createElement('button'); b.className = 'level-choice'; b.disabled = i > unlocked;
-      const name = document.createElement('strong'); name.textContent = `0${i + 1}　${level.title}`; name.style.fontWeight = '400';
-      const arcana = document.createElement('small'); arcana.className = 'arcana-name'; arcana.textContent = level.arcana; name.append(arcana);
-      const status = document.createElement('span'); status.textContent = i > unlocked ? '尚未抵达' : completed.includes(i) ? '已完成 · 重温' : '开始';
-      b.append(name, status); b.onclick = () => start(i); $('levelItems').append(b);
-    });
-    show('menu');
-    if (!reduced) $('levelItems').querySelectorAll('button').forEach((b,i) => b.animate?.([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}],{duration:420,delay:i*55,easing:'cubic-bezier(.16,1,.3,1)',fill:'backwards'}));
-  };
-  controls(); requestAnimationFrame(frame);
+  const community=new EchoCommunity(window.ECHO_COMMUNITY_CONFIG),serviceMessage='留言与点赞暂未开放。游戏可以完整游玩，接入文件已准备好。';
+  let pageCursor=null,communityBusy=false;
+  function communityState(text){$('communityStatus').textContent=text;}
+  function renderComments(rows,append){if(!append)$('commentList').replaceChildren();for(const row of rows){const article=document.createElement('article');article.className='comment';const name=document.createElement('strong');name.textContent=row.nickname||'一位过客';const time=document.createElement('time');time.textContent=new Date(row.created_at).toLocaleDateString('zh-CN');const body=document.createElement('p');body.textContent=row.body;article.append(name,time,body);$('commentList').append(article);}}
+  async function readComments(append=false){if(communityBusy)return;communityBusy=true;$('moreComments').disabled=true;communityState('正在读取微光……');try{const result=await community.readComments(append?pageCursor:null);renderComments(result.rows,append);pageCursor=result.next;visible('moreComments',!!pageCursor);communityState(result.rows.length||append?'留言提交后会公开可见。':'还没有留言。愿你成为第一束光。');}catch{communityState('暂时连接不上留言服务。输入不会丢失，请稍后重试。');visible('moreComments',true);$('moreComments').textContent='重试读取';}finally{communityBusy=false;$('moreComments').disabled=false;}}
+  $('commentsButton').onclick=()=>{checkpoint();show('community');if(community.configured)readComments();else{communityState(serviceMessage);for(const id of ['nickname','commentBody','submitComment'])$(id).disabled=true;}};
+  $('closeCommunity').onclick=home;$('moreComments').onclick=()=>readComments(!!pageCursor);
+  $('commentForm').addEventListener('submit',async e=>{e.preventDefault();if(communityBusy||!community.configured)return;const nickname=$('nickname').value.trim(),body=$('commentBody').value.trim();if(!body||[...nickname].length>16||[...body].length>300){communityState('请留下 1—300 字的留言，称呼不超过 16 字。');return;}communityBusy=true;$('submitComment').disabled=true;communityState('正在送出微光……');let sent=false;try{await community.submitComment(nickname,body);$('commentBody').value='';sent=true;tone(523.25);}catch{communityState('未能送出。内容已保留，请重试。');}finally{communityBusy=false;$('submitComment').disabled=false;}if(sent){await readComments();communityState('微光已送达，公开可见。');}});
+  function likeView(info){$('likeLabel').textContent=`${info.liked?'已赞':'点赞'} · ${info.count}`;$('likeButton').setAttribute('aria-pressed',String(info.liked));}
+  let liking=false;$('likeButton').onclick=async()=>{if(!community.configured){$('commentsButton').click();return;}if(liking)return;liking=true;$('likeButton').disabled=true;try{likeView(await community.toggleLike());}catch{$('likeLabel').textContent='点赞未送达 · 重试';}finally{liking=false;$('likeButton').disabled=false;}};
+  if(community.configured)community.readLikes().then(likeView).catch(()=>{$('likeLabel').textContent='点赞暂不可用 · 重试';});
+  controls();show('title');requestAnimationFrame(frame);
+  document.fonts?.ready.then(()=>{renderer.layoutKey='';});
 })();

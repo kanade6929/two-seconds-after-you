@@ -20,39 +20,35 @@
       c.setTransform(1, 0, 0, 1, 0, 0);
     }
     point(e) { const r = this.canvas.getBoundingClientRect(); return { x: (e.clientX - r.left - this.ox) / this.scale, y: (e.clientY - r.top - this.oy) / this.scale, down: e.buttons === 1 }; }
+    layout(game,mobile){
+      this.mobile=mobile;const r=this.canvas.getBoundingClientRect();
+      if(!mobile||!game){this.scale=Math.min(r.width/W,r.height/H);this.ox=(r.width-W*this.scale)/2;this.oy=(r.height-H*this.scale)/2;this.sceneBounds=null;this.layoutKey='';return;}
+      const key=[game.index,game.state.phase,r.width,r.height,document.getElementById('gameBottom').hidden].join(':');if(this.layoutKey===key&&this.layoutGame===game)return;this.layoutKey=key;this.layoutGame=game;
+      const landscape=r.width>r.height,heading=document.getElementById('gameHeading').getBoundingClientRect(),bottom=document.getElementById('gameBottom').getBoundingClientRect();
+      const left=landscape?248:14,top=landscape?68:Math.max(190,heading.bottom+14),width=r.width-left-14,height=Math.max(100,(landscape?r.height-126:bottom.top-12)-top);
+      const points=[...game.view.nodes,game.point,...(game.echo?[game.echo]:[]),...(game.view.target?[{x:600,y:185}]:[])];const minX=Math.min(...points.map(p=>p.x))-90,maxX=Math.max(...points.map(p=>p.x))+90,minY=Math.min(...points.map(p=>p.y))-65,maxY=Math.max(...points.map(p=>p.y))+85;
+      const spanX=Math.max(400,maxX-minX),spanY=Math.max(280,maxY-minY);this.scale=Math.min(width/spanX,height/spanY,1);this.ox=left+width/2-(minX+maxX)/2*this.scale;this.oy=top+height/2-(minY+maxY)/2*this.scale;
+      this.sceneBounds={x:minX,y:minY,width:maxX-minX,height:maxY-minY};
+    }
     circle(x, y, r, color, fill = false, width = 1) {
       const c = this.ctx; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.lineWidth = width;
       if (fill) { c.fillStyle = color; c.fill(); } else { c.strokeStyle = color; c.stroke(); }
     }
     text(text, x, y, color = C.muted, size = 13, align = 'center') {
-      const c = this.ctx; c.fillStyle = color; c.font = `${size}px "Microsoft YaHei UI",sans-serif`; c.textAlign = align; c.fillText(text, x, y);
+      const c = this.ctx; c.fillStyle = color; c.font = `${this.mobile?Math.max(size,11/this.scale):size}px "Arcana YueSong","SimSun",serif`; c.textAlign = align; c.fillText(text, x, y);
     }
     path(points, color, width = 1, dash = []) {
       const c = this.ctx; c.beginPath(); points.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.strokeStyle = color; c.lineWidth = width; c.setLineDash(dash); c.stroke(); c.setLineDash([]);
     }
-    sigil(name, x, y, color, intensity = 0) {
-      // Tarot totems use straight strokes exclusively, including the moon.
-      const c = this.ctx;
-      const stroke = (pairs, width = 1.35) => this.path(pairs.map(([dx,dy]) => ({x:x+dx,y:y+dy})), color, width);
-      c.save(); c.lineCap = 'butt'; c.lineJoin = 'miter'; c.miterLimit = 2;
-      c.shadowColor = color; c.shadowBlur = intensity * 9 * this.scale;
-      if (name === '星星') {
-        stroke([[0,-22],[5,-6],[20,0],[5,6],[0,22],[-5,6],[-20,0],[-5,-6],[0,-22]]);
-        stroke([[-13,-13],[13,13]],.85); stroke([[13,-13],[-13,13]],.85);
-        stroke([[0,-6],[4,0],[0,6],[-4,0],[0,-6]],.9);
-      } else if (name === '月亮') {
-        stroke([[7,-22],[-8,-17],[-17,-5],[-17,7],[-7,19],[7,22],[-1,10],[-5,0],[-1,-10],[7,-22]]);
-        stroke([[13,-7],[16,0],[13,7],[10,0],[13,-7]],1);
-        stroke([[-23,0],[-20,0]],1);
-      } else if (name === '太阳') {
-        stroke([[0,-11],[11,0],[0,11],[-11,0],[0,-11]]);
-        stroke([[0,-5],[5,0],[0,5],[-5,0],[0,-5]],.8);
-        for (let i=0;i<8;i++) {
-          const a=i*Math.PI/4;
-          stroke([[Math.cos(a)*16,Math.sin(a)*16],[Math.cos(a)*24,Math.sin(a)*24]],i%2?1:1.4);
-        }
-      }
+    sigil(name, x, y, color, intensity=0, size=1) {
+      const c=this.ctx;c.save();c.lineCap='butt';c.lineJoin='miter';c.shadowColor=color;c.shadowBlur=intensity*8*this.scale;
+      for(const points of ArcanaSymbols.paths(name))this.path(points.map(([dx,dy])=>({x:x+dx*size,y:y+dy*size})),color,1.3);
       c.restore();
+    }
+    polygon(x,y,r,color,fill=false,sides=4,angle=-Math.PI/2) {
+      const points=Array.from({length:sides+1},(_,i)=>({x:x+Math.cos(angle+i*Math.PI*2/sides)*r,y:y+Math.sin(angle+i*Math.PI*2/sides)*r}));
+      if(fill){const c=this.ctx;c.beginPath();points.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y));c.fillStyle=color;c.fill();}
+      else this.path(points,color);
     }
     base() {
       const c = this.ctx; c.setTransform(1, 0, 0, 1, 0, 0);
@@ -166,184 +162,95 @@
       if (echo) this.glow(echo, C.red, t, reduced, Math.min(1, Math.max(0, (t - 2) / .3)), true);
       if (point) this.glow(point, C.ink, t, reduced);
     }
-    title(point, echo, timeline, t, reduced) {
-      this.base(); this.atmosphere(t, reduced); const c = this.ctx;
-      const x = 850, y = 300;
-      this.circle(x, y, 170, C.line); this.circle(x, y, 112, C.line);
-      this.path([{ x: x - 222, y }, { x: x + 222, y }], C.line, 1, [2, 7]);
-      this.path([{ x, y: y - 222 }, { x, y: y + 222 }], C.line, 1, [2, 7]);
-      const angle = reduced ? -.55 : t * .17 - .55;
-      const p = { x: x + Math.cos(angle) * 170, y: y + Math.sin(angle) * 170 };
-      const e = { x: x + Math.cos(angle - .8) * 170, y: y + Math.sin(angle - .8) * 170 };
-      c.beginPath(); c.arc(x, y, 170, angle - .8, angle); c.strokeStyle = C.red; c.lineWidth = 1.5; c.stroke();
-      this.glow(p, C.ink, t, reduced); this.glow(e, C.red, t, reduced, 1, true);
-      this.text('2.00', x, y + 8, C.ink, 36); this.text('秒 的 距 离', x, y + 40, C.muted, 12);
-      this.text('NOW', x + 200, y + 4, C.muted, 10); this.text('THEN', x, y - 238, C.muted, 10);
-      this.cursors(point, echo, timeline, reduced, t);
+
+    title(point,echo,timeline,t,reduced) {
+      this.base();this.atmosphere(t,reduced);
+      const x=875,y=328,c=this.ctx;
+      this.path([{x:x-145,y:115},{x:x+145,y:115},{x:x+158,y:128},{x:x+158,y:525},{x:x+145,y:538},{x:x-145,y:538},{x:x-158,y:525},{x:x-158,y:128},{x:x-145,y:115}],C.line);
+      this.path([{x:x-142,y:140},{x:x+142,y:140}],C.line);
+      this.path([{x:x-142,y:512},{x:x+142,y:512}],C.line);
+      this.polygon(x,y,145,C.line);this.polygon(x,y,98,C.line);
+      c.save();c.globalAlpha=reduced?.9:.8+Math.sin(t*.7)*.15;this.sigil('星星',x,y,C.ink,.5,2.1);c.restore();
+      this.sigil('月亮',x-86,y-108,C.red,.3,.9);this.sigil('太阳',x+86,y+108,C.red,.3,.9);
+      this.text('PAST  /  PRESENT',x,170,C.muted,10);this.text('2.00',x,465,C.red,22);
+      this.cursors(null,echo,timeline,reduced,t);
     }
     mix(a,b,t) {
-      const channel=(s,n)=>parseInt(s.slice(n,n+2),16);
-      return '#'+[1,3,5].map(n=>Math.round(channel(a,n)+(channel(b,n)-channel(a,n))*Math.max(0,Math.min(1,t))).toString(16).padStart(2,'0')).join('');
+      return '#'+[1,3,5].map(n=>Math.round(parseInt(a.slice(n,n+2),16)+(parseInt(b.slice(n,n+2),16)-parseInt(a.slice(n,n+2),16))*Math.max(0,Math.min(1,t))).toString(16).padStart(2,'0')).join('');
     }
-    updateVisuals(game,dt,reduced,mode) {
-      if(this.lastGame!==game){this.lastGame=game;this.lights=game.active.map(()=>({now:0,echo:0,level:0}));this.doorLight=0;this.latchLight=0;this.chargeLight=0;this.gateLight=0;this.beamLight=0;this.crystalLights=(game.level.targets||[]).map(()=>0);this.particles=[];this.fadeAt=null;}
-      this.visualTime+=dt;
-      const approach=(v,target,tau)=>v+(target-v)*(1-Math.exp(-dt/tau));
-      game.active.forEach((a,i)=>{
-        const light=this.lights[i], role=game.level.switches[i].role;
-        const now=a.now&&role!=='echo', echo=a.echo&&role!=='now';
-        const retained=game.lit[i];
-        const codeOnly=game.level.rule==='code'||(game.level.rule==='finale'&&i<2);
-        const target=mode==='failed'?0:game.level.rule==='balance'?game.energy[i]:retained?1:codeOnly?game.pulse[i]:(now||echo?1:0);
-        if(!reduced&&target>.8&&light.level<.08) this.burst(game.positions[i],echo?C.red:C.ink,18);
-        light.now=approach(light.now,now?1:0,.35);light.echo=approach(light.echo,echo||retained?1:0,.45);
-        light.level=approach(light.level,target,target>light.level?.15:.6);
-      });
-      const target=mode==='failed'?0:game.open?Math.max(.25,game.grace/.65):0;
-      this.doorLight=approach(this.doorLight,target,target>this.doorLight?.18:.45);
-      this.latchLight=approach(this.latchLight,game.latched?1:0,.25);
-      this.chargeLight=approach(this.chargeLight,game.latched?0:Math.min(1,game.hold/.3),.18);
-      this.gateLight=approach(this.gateLight||0,game.gateOpen||game.latched?1:0,.25);
-      this.beamLight=approach(this.beamLight||0,game.beamOn?1:0,.18);
-      this.crystalLights=this.crystalLights.map((v,i)=>approach(v,mode==='failed'?0:i<game.crystal?1:0,.25));
-      this.particles=this.particles.filter(p=>(p.age+=dt)<p.life);
+    burst(origin,color,count=18) {
+      for(let i=0;i<count&&this.particles.length<180;i++){const a=i*2.39996,v=15+(i%5)*7;this.particles.push({x:origin.x,y:origin.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,age:0,life:.6+i%3*.15,color});}
     }
-    burst(origin,color,count=28) {
-      for(let i=0;i<count&&this.particles.length<240;i++){
-        const a=i*2.39996, speed=13+(i%7)*7;
-        this.particles.push({x:origin.x,y:origin.y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,age:0,life:1.1+(i%5)*.2,color});
-      }
-    }
-    drawParticles(reduced) {
-      if(reduced)return;
-      const c=this.ctx;c.save();
-      for(const p of this.particles){const f=p.age/p.life,travel=(1-Math.exp(-p.age*1.3))/1.3;
-        c.globalAlpha=Math.sin(Math.PI*f)*.55;
-        // Short drifting motes, separate from the continuous cursor ribbon.
-        this.path([{x:p.x+p.vx*travel,y:p.y+p.vy*travel},{x:p.x+p.vx*travel-p.vx*.045,y:p.y+p.vy*travel-p.vy*.045}],p.color,1);
-      }c.restore();
-    }
-    orbitParticles(origin,intensity,t,reduced,color=C.ink){
-      if(reduced||intensity<.01)return;
-      const c=this.ctx;c.save();
-      for(let i=0;i<18;i++){
-        const a=t*(i%2?.7:-.48)+i*2.39996,r=52+(i%4)*6+Math.sin(t+i)*3;
-        c.globalAlpha=intensity*(.3+.45*(.5+.5*Math.sin(t*1.7+i)));
-        const x=origin.x+Math.cos(a)*r,y=origin.y+Math.sin(a)*r;
-        this.path([{x,y},{x:x-Math.sin(a)*4,y:y+Math.cos(a)*4}],color,i%5===0?1.7:1);
-      }c.restore();
-    }
-    ripple(origin,age,reduced){
-      const c=this.ctx,max=Math.max(...[[0,0],[this.canvas.width/this.dpr,0],[0,this.canvas.height/this.dpr],[this.canvas.width/this.dpr,this.canvas.height/this.dpr]].map(([x,y])=>Math.hypot((x-this.ox)/this.scale-origin.x,(y-this.oy)/this.scale-origin.y)))+100;
-      c.save();
-      if(reduced){this.glow(origin,C.red,0,true,Math.max(0,1-age/.5));c.restore();return;}
-      c.globalCompositeOperation='lighter';
-      // A gathering corona, a single bright bloom, then three chromatic wavefronts.
-      if(age<.4){
-        const f=age/.4;c.globalAlpha=1-f*.3;
-        this.circle(origin.x,origin.y,90*(1-f)+12,C.ink,false,2+f*5);
-        this.glow(origin,C.red,0,true,.7+f);
-      }
-      const burst=Math.max(0,age-.16),fade=Math.max(0,1-burst/2.4);
-      if(burst>0){
-        const bloom=c.createRadialGradient(origin.x,origin.y,0,origin.x,origin.y,220);
-        bloom.addColorStop(0,'#fff4d9');bloom.addColorStop(.12,'#edbd8880');bloom.addColorStop(.6,'#89e5ed25');bloom.addColorStop(1,'#89e5ed00');
-        c.globalAlpha=Math.exp(-burst*4)*.9;this.circle(origin.x,origin.y,220,bloom,true);
-      }
-      const colors=[C.ink,C.red,'#9ebce8'];
-      for(let j=0;j<3;j++){
-        const t=burst-j*.14;if(t<=0)continue;
-        const f=Math.min(1,t/1.4),r=20+max*(1-Math.pow(1-f,2)),a=Math.max(0,1-t/2.2);
-        const wash=c.createRadialGradient(origin.x,origin.y,Math.max(0,r-100),origin.x,origin.y,r+15);
-        wash.addColorStop(0,colors[j]+'00');wash.addColorStop(.55,colors[j]+'16');wash.addColorStop(.86,colors[j]+'62');wash.addColorStop(1,colors[j]+'00');
-        c.globalAlpha=a*.7;this.circle(origin.x,origin.y,r+15,wash,true);
-        c.globalAlpha=a*.85;this.circle(origin.x,origin.y,r,colors[j],false,2.5-j*.6);
-      }
-      for(let i=0;i<100;i++){
-        const a=i*2.39996,speed=95+(i%17)*24,travel=speed*(1-Math.exp(-burst*1.5));
-        const r=18+travel,x=origin.x+Math.cos(a)*r,y=origin.y+Math.sin(a)*r;
-        c.globalAlpha=fade*fade*(.4+(i%3)*.2);
-        this.path([{x,y},{x:x-Math.cos(a)*(8+burst*18),y:y-Math.sin(a)*(8+burst*18)}],colors[i%3],i%7===0?2:1);
-      }
-      c.globalAlpha=Math.exp(-burst*2.6)*.4;
-      this.path([{x:origin.x-500,y:origin.y},{x:origin.x+500,y:origin.y}],C.ink,2);
+    orbitParticles(p,amount,t,reduced,color=C.red) {
+      if(reduced||amount<.01)return;const c=this.ctx;c.save();
+      for(let i=0;i<10;i++){const a=t*.5+i*2.39996,r=44+i%3*4;c.globalAlpha=amount*(.2+.3*(1+Math.sin(t+i))/2);this.path([{x:p.x+Math.cos(a)*r,y:p.y+Math.sin(a)*r},{x:p.x+Math.cos(a)*r-Math.sin(a)*3,y:p.y+Math.sin(a)*r+Math.cos(a)*3}],color);}
       c.restore();
     }
-    game(game, mode, reduced, dt=1/60) {
-      this.updateVisuals(game,dt,reduced,mode);
-      this.base(); this.atmosphere(this.visualTime, reduced); const c = this.ctx, l = game.level, e = l.exit;
-      const active = game.active;
-      const doorColor=this.mix(C.line,C.red,this.doorLight);
-      const switches=game.positions;
-      if(l.orbit)this.circle(l.orbit.cx,l.orbit.cy,l.orbit.r,C.line,false,1);
-      if(l.gate){
-        const g=l.gate,col=this.mix('#476179',C.red,this.gateLight),gap=g.half*this.gateLight;
-        const top=-this.oy/this.scale,bottom=(this.canvas.height/this.dpr-this.oy)/this.scale;
-        this.path([{x:g.x,y:top},{x:g.x,y:g.y-gap}],col,2);
-        this.path([{x:g.x,y:g.y+gap},{x:g.x,y:bottom}],col,2);
-        this.text(game.gateOpen?'光隙已打开':'由过去开闸',g.x,g.y-110,col,12);
+    drawParticles(reduced) {
+      if(reduced)return;const c=this.ctx;c.save();for(const p of this.particles){const f=p.age/p.life;c.globalAlpha=Math.sin(Math.PI*f)*.5;this.path([{x:p.x+p.vx*p.age,y:p.y+p.vy*p.age},{x:p.x+p.vx*(p.age-.04),y:p.y+p.vy*(p.age-.04)}],p.color);}c.restore();
+    }
+    ripple(origin,age,reduced) {
+      const c=this.ctx;c.save();
+      if(reduced){this.glow(origin,C.red,0,true,Math.max(0,1-age/.4));c.restore();return;}
+      const far=Math.max(...[[0,0],[this.canvas.width,0],[0,this.canvas.height],[this.canvas.width,this.canvas.height]].map(([x,y])=>Math.hypot((x/this.dpr-this.ox)/this.scale-origin.x,(y/this.dpr-this.oy)/this.scale-origin.y)))+60;
+      c.globalCompositeOperation='lighter';
+      for(let i=0;i<3;i++){const f=Math.max(0,Math.min(1,(age-i*.08)/.8));if(f===0)continue;const r=20+far*(1-(1-f)**2);c.globalAlpha=(1-f)*.55;this.polygon(origin.x,origin.y,r,i%2?C.red:C.ink,false,8);this.polygon(origin.x,origin.y,r*.98,C.ink,false,8);}
+      for(let i=0;i<64;i++){const a=i*2.39996,r=30+age*(160+i%9*40);c.globalAlpha=Math.max(0,1-age)*.55;this.path([{x:origin.x+Math.cos(a)*r,y:origin.y+Math.sin(a)*r},{x:origin.x+Math.cos(a)*(r+14),y:origin.y+Math.sin(a)*(r+14)}],i%2?C.red:C.ink);}
+      this.glow(origin,C.red,age,true,Math.max(0,1-age));c.restore();
+    }
+    game(game,mode,reduced,dt=1/60) {
+      if(this.lastGame!==game){this.lastGame=game;this.nodeLights=new Map();this.particles=[];this.doorLight=0;this.beamLight=0;this.lastBeams=[];this.sunLights=[0,0];}
+      this.visualTime+=dt;this.particles=this.particles.filter(p=>(p.age+=dt)<p.life);
+      this.base();this.atmosphere(this.visualTime,reduced);
+      const c=this.ctx,v=game.view,R=EchoCore.Rules,t=this.visualTime;
+      const approach=(a,b,duration)=>a+(b-a)*(1-Math.exp(-dt/(duration/3)));
+      if(v.axis)this.path([{x:600,y:230},{x:600,y:490}],C.line,1,[5,7]);
+      for(const line of v.lines)this.path(line,C.line);
+      if(v.world){
+        const points=[...R.worldVertices,R.worldVertices[0]];this.path(points,C.line,1.2);
+        for(let i=0;i<32;i++){const a=R.worldPoint(i/8),b=R.worldPoint(i/8+.045);this.path([a,b],C.muted,.8);}
+        this.polygon(v.guide.x,v.guide.y,7,C.ink);
       }
-      if(l.targets){
-        if(game.echo&&this.beamLight>.01){
-          c.save();c.globalAlpha=this.beamLight*.15;this.path([game.echo,game.point],C.ink,8);
-          c.globalAlpha=this.beamLight*.8;this.path([game.echo,game.point],C.ink,1.5);c.restore();
-        }
-        l.targets.forEach((p,i)=>{
-          const lit=this.crystalLights[i],color=this.mix(i===game.crystal?C.ink:C.muted,C.red,lit);
-          this.path([{x:p.x,y:p.y-14},{x:p.x+10,y:p.y},{x:p.x,y:p.y+14},{x:p.x-10,y:p.y},{x:p.x,y:p.y-14}],color,1.6);
-          this.text(String(i+1).padStart(2,'0'),p.x,p.y+36,color,12);
-          if(lit>.01)this.orbitParticles(p,lit*.6,this.visualTime,reduced,C.red);
-        });
-      }else if(!l.gate){
-        switches.forEach(s=>this.path([{x:s.x,y:s.y},{x:e.x,y:e.y}],doorColor,1));
+      this.beamLight=approach(this.beamLight,v.beams?.length?1:0,v.beams?.length?.14:.18);
+      if(v.beams?.length)this.lastBeams=v.beams;
+      for(const line of this.lastBeams){
+        let end=line[1];
+        for(const wall of v.walls){const hit=R.intersection(line[0],end,wall[0],wall[1]);if(hit)end=hit;}
+        c.save();c.globalAlpha=.14*this.beamLight;this.path([line[0],end],C.ink,6);c.globalAlpha=.7*this.beamLight;this.path([line[0],end],C.ink,1.2);c.restore();
       }
-      if(l.code){
-        this.text(l.code.map((v,i)=>i<game.phase?'✓':l.switches[v].name).join('   →   '),600,190,game.codeError?'#e9a19b':C.red,17);
+      for(const line of v.walls)this.path(line,'#acb8bd',3);
+      if(v.sun){
+        this.sigil('太阳',600,365,C.red,game.hold>0?.7:0,1.65);
+        for(let i=0;i<2;i++){const active=i===0?game.effect.left:game.effect.right;this.sunLights[i]=approach(this.sunLights[i],active?1:0,active?.14:.18);this.polygon(v.sun.receivers[i].x,v.sun.receivers[i].y,8,this.mix(C.line,i?C.ink:C.red,this.sunLights[i]),true);}
       }
-      switches.forEach((s, i) => {
-        const a = active[i], light=this.lights[i], hue=this.mix(C.ink,C.red,light.echo),color=this.mix('#627b92',hue,light.level);
-        this.glow(s,hue,this.visualTime,reduced,light.level*.18);
-        this.orbitParticles(s,light.level,this.visualTime,reduced,hue);
-        this.circle(s.x, s.y, 44, this.mix('#101c2a',this.mix('#172e35','#282322',light.echo),light.level), true);
-        this.circle(s.x, s.y, 44, color, false, 1+light.level*.5);
-        if (s.name) this.sigil(s.name, s.x, s.y, color, light.level);
-        else this.circle(s.x, s.y, 34, C.line, false, 1);
-        if(s.role)this.text(s.role==='now'?'现':'昔',s.x,s.y+5,s.role==='now'?C.ink:C.red,12);
-        else if(!s.name)this.circle(s.x, s.y, 3, color, true);
-        // The remaining arc is the visible afterglow, decaying instead of snapping off.
-        if(light.level>.01){c.beginPath();c.arc(s.x,s.y,39,-Math.PI/2,-Math.PI/2+Math.PI*2*light.level);c.strokeStyle=color;c.lineWidth=1.5;c.stroke();}
-        if(this.chargeLight>.01){c.save();c.globalAlpha=this.chargeLight;c.beginPath();c.arc(s.x,s.y,49,-Math.PI/2,-Math.PI/2+Math.PI*2*this.chargeLight);c.strokeStyle=C.red;c.lineWidth=2;c.stroke();c.restore();}
-        this.text(s.label, s.x, s.y + 67, this.mix(C.muted,hue,light.level), 12);
-        if(l.rule==='balance'){
-          c.beginPath();c.arc(s.x,s.y,52,-Math.PI/2+Math.PI*2*.35,-Math.PI/2+Math.PI*2*.85);c.strokeStyle=C.ink;c.lineWidth=2;c.stroke();
-          this.text(Math.round(game.energy[i]*100)+'%',s.x,s.y+88,game.energy[i]>.85?C.red:C.muted,11);
-        }
-      });
-      this.glow(e,C.red,this.visualTime,reduced,this.doorLight*.3);
-      this.circle(e.x, e.y, 49, this.mix('#101c2a','#282322',this.doorLight), true);
-      this.circle(e.x, e.y, 49, doorColor, false, 1.5);
-      if(l.beat){
-        c.beginPath();c.arc(e.x,e.y,61,-Math.PI/2,-Math.PI/2+Math.PI*2*l.beat.window/l.beat.period);c.strokeStyle=C.red;c.lineWidth=4;c.stroke();
-        const a=game.beatPhase*Math.PI*2-Math.PI/2;
-        this.path([{x:e.x+Math.cos(a)*55,y:e.y+Math.sin(a)*55},{x:e.x+Math.cos(a)*68,y:e.y+Math.sin(a)*68}],C.ink,2);
+      for(const star of v.stars)this.sigil('星星',star.x,star.y,C.red,0,.55);
+      if(v.target){this.sigil(v.target,600,185,C.red,.3,.65);this.text('寻找此纹',650,190,C.muted,11,'left');}
+      for(let i=0;i<v.nodes.length;i++){
+        const n=v.nodes[i],now=R.near(game.point,n)&&n.role!=='echo',echo=R.near(game.echo,n)&&n.role!=='now';
+        let active=now||echo;if(n.id==='seal')active=game.open;if(n.exit)active=game.open;
+        if(n.id==='receiver')active=game.hold>0;
+        const old=this.nodeLights.get(n.id)||0,light=approach(old,active?1:0,active?.14:n.exit?.16:.18);this.nodeLights.set(n.id,light);
+        if(old<.05&&light>.05&&!reduced)this.burst(n,echo?C.red:C.ink,10);
+        const hue=n.role==='echo'||echo?C.red:C.ink,col=this.mix('#677e90',hue,light);
+        this.glow(n,hue,t,reduced,light*.13);
+        this.polygon(n.x,n.y,n.exit?44:39,this.mix('#101c2a','#192b35',light),true,8,Math.PI/8);
+        this.polygon(n.x,n.y,n.exit?44:39,col,false,8,Math.PI/8);
+        if(n.mirror!==undefined){const ends=n.mirror===0?[[-18,0],[18,0]]:n.mirror===1?[[-15,15],[15,-15]]:[[-15,-15],[15,15]];this.path(ends.map(([x,y])=>({x:n.x+x,y:n.y+y})),col,2);}
+        else this.sigil(n.sigil,n.x,n.y,col,light,.72);
+        this.orbitParticles(n,light,t,reduced,hue);
+        const labelColor=this.mix(C.muted,hue,light);
+        if(game.level.id==='star'&&!game.ready)this.text(this.mobile?n.label[0]:n.label,n.x+(n.role==='echo'?-48:48),n.y+4,labelColor,12,n.role==='echo'?'right':'left');
+        else this.text(n.label,n.x,n.y+59,labelColor,12);
+        const amount=n.id==='seal'?game.sealHold/.4:n.exit?game.exitHold/.25:n.id==='source'?(game.timers.source||0)/.4:n.id==='well'?(game.timers.well||0)/.4:n.id==='learn'?(game.timers.learn||0)/.4:active?v.progress:0;
+        if(amount>0){this.path([{x:n.x-20,y:n.y+45},{x:n.x+20,y:n.y+45}],C.line,2);this.path([{x:n.x-20,y:n.y+45},{x:n.x-20+40*Math.min(1,amount),y:n.y+45}],hue,2);}
+        if(v.energy){const energy=v.energy[i];this.text(Math.round(energy*100)+'%',n.x,n.y+80,energy>=.45&&energy<=.55?C.ink:C.red,12);this.path([{x:n.x-27,y:n.y+90},{x:n.x+27,y:n.y+90}],C.line,3);this.path([{x:n.x-27,y:n.y+90},{x:n.x-27+54*energy,y:n.y+90}],C.red,3);}
       }
-      const col = this.mix('#7990a5',C.red,this.doorLight);
-      // Door halves separate when its circuit has power.
-      const gap = this.doorLight*12;
-      this.path([{ x: e.x - 15 - gap, y: e.y + 20 }, { x: e.x - 15 - gap, y: e.y - 20 }, { x: e.x - gap, y: e.y - 20 }], col, 1.5);
-      this.path([{ x: e.x + gap, y: e.y - 20 }, { x: e.x + 15 + gap, y: e.y - 20 }, { x: e.x + 15 + gap, y: e.y + 20 }], col, 1.5);
-      c.save();c.globalAlpha=this.doorLight;this.circle(e.x,e.y,3,C.red,true);c.restore();
-      this.text(game.open ? '出口已打开 · 点击' : '出口', e.x, e.y + 80, this.mix(C.muted,C.red,this.doorLight), 13);
-      const fading=['celebrate','complete','failed','ending'].includes(mode)?this.visualTime-(this.fadeAt??this.visualTime):0;
-      if(['celebrate','failed'].includes(mode)){if(this.fadeAt==null)this.fadeAt=this.visualTime;}else if(mode==='play')this.fadeAt=null;
-      c.save();c.globalAlpha=Math.max(0,1-fading/1.4);this.cursors(game.point,game.echo,game.timeline,reduced,game.t);c.restore();
+      if(game.ready){this.text(game.open?'门印有光':'影子守印 0.4 秒',game.level.seal.x,game.level.seal.y-64,C.muted,11);this.text(game.exitHold>=.25?'可以点击':'停稳 0.25 秒',game.level.exit.x,game.level.exit.y-64,C.muted,11);}
+      const progress=game.ready?Math.min(1,game.exitHold/.25):v.progress;
+      if(!this.mobile){this.path([{x:515,y:542},{x:685,y:542}],C.line,2);if(progress>0)this.path([{x:515,y:542},{x:515+170*progress,y:542}],C.red,2);}
+      c.save();c.globalAlpha=mode==='celebrate'?.4:1;this.cursors(null,game.echo,game.timeline,reduced,game.t);c.restore();
       this.drawParticles(reduced);
-      if (mode === 'reconnect') {
-        this.circle(game.point.x, game.point.y, 34, C.red, false, 1.5);
-        this.text('从这里继续', game.point.x, game.point.y - 47, C.red, 13);
-      }
-      if (!game.echo) this.text('过去的你正在赶来…', 600, 535, C.muted, 12);
     }
   }
-  window.EchoRenderer = Renderer;
+  window.EchoRenderer=Renderer;
 })();

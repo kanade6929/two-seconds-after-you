@@ -2,65 +2,47 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#090f19">
-  <meta name="description" content="和两秒前的自己合作。循着大阿卡那的八束微光，在月亮、星星与世界之间，完成八个夜色里的鼠标谜题。">
-  <title>两秒之后的你 · A little duet with yourself</title>
+  <meta name="description" content="循着八张牌的微光，与两秒前的自己，走过这一夜。一个关于成长与接纳的鼠标解谜游戏。">
+  <title>辰星夜 · 与过去的自己，共赴星夜</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="preload" href="assets/FZfont140.TTF" as="font" type="font/ttf" crossorigin>
 </head>
 <body>
-  <main id="app">
-    <header class="topbar">
-      <button id="home" class="wordmark" aria-label="返回标题">两秒之后的你<span class="wordmark-dot"></span></button>
-      <nav id="settings" aria-label="游戏设置">
-        <button id="levelsButton" aria-expanded="false">章节 <span id="chapterCount">01 / 08</span></button>
-        <button id="sound" aria-pressed="false">声音 · 开</button>
-        <button id="motion" aria-pressed="false">动态 · 完整</button>
-      </nav>
-    </header>
-
-    <section id="stage" aria-label="两秒延迟光标解谜游戏">
-      <canvas id="canvas" aria-label="移动鼠标控制实心光点；空心光点重复两秒前的动作。停留在圆形开关，出口打开后点击出口。"></canvas>
-      <div id="titleScreen" class="screen title-screen">
-        <div class="title-copy">
-          <h1>两秒之后<span>的你<span class="title-period">。</span></span></h1>
-          <p class="english-title">A LITTLE DUET WITH YOURSELF</p>
-          <p class="intro">循着大阿卡那的微光，<br>让过去的你，接住现在。</p>
-          <button id="start" class="primary">开始这场合作 <span aria-hidden="true">↗</span></button>
-          <div class="title-actions"><button id="continueGame" disabled>继续游戏 · 尚无进度</button><button id="titleLevels">选择关卡</button></div>
-          <p class="micro">八个瞬间 · 只需鼠标 · 不用着急</p>
-        </div>
-        <div class="title-note"><span class="note-line"></span>移动鼠标，认识两秒前的你。</div>
+<main id="app">
+  <canvas id="canvas" aria-label="青色是现在的你，暖金重复两秒前的位置与动作。停留触发机关，点击出口。"></canvas>
+  <header class="topbar">
+    <button id="home" class="wordmark" data-symbol="世界">辰星夜</button>
+    <nav aria-label="设置"><button id="levelsButton" data-symbol="chapters">牌章</button><button id="sound" data-symbol="sound" aria-pressed="false"><span id="soundLabel">声音 · 开</span></button><button id="motion" data-symbol="星星" aria-pressed="false"><span id="motionLabel">动态 · 完整</span></button></nav>
+  </header>
+  <section id="titleScreen" class="title-screen screen">
+    <div class="title-copy">
+      <div class="title-logo">
+        <svg class="title-crown" viewBox="0 0 360 86" aria-hidden="true"><path d="M16 62H101L125 38L149 62H162 M198 62H211L235 38L259 62H344 M101 62L125 76L149 62 M211 62L235 76L259 62 M153 40L180 13L207 40L180 67Z M180 0V8 M180 72V83 M143 40H150 M210 40H217 M180 22L184 36L198 40L184 44L180 58L176 44L162 40L176 36Z M52 55V69 M62 58V66 M298 58V66 M308 55V69"/></svg>
+        <h1 aria-label="辰星夜"><span>辰</span><span class="title-star">星</span><span>夜</span></h1>
+        <svg class="title-rule" viewBox="0 0 360 20" aria-hidden="true"><path d="M20 10H157 M203 10H340 M166 10L180 2L194 10L180 18Z M52 7V13 M308 7V13"/></svg>
       </div>
-
-      <div id="gameHeading" class="game-heading" hidden>
-        <span id="levelNumber" class="level-number">01</span>
-        <div><h1 id="levelTitle">留一下</h1><p id="levelDescription"></p></div>
-      </div>
-      <div id="gameBottom" class="game-bottom" hidden>
-        <p id="status" role="status" aria-live="polite"></p>
-        <div><button id="hintButton" hidden aria-expanded="false">一点提示</button><button id="retry">重新来过</button><button id="pause">暂停</button></div>
-      </div>
-      <aside id="hint" hidden></aside>
-      <div id="pauseScreen" class="screen centered" hidden>
-        <div class="pause-card"><p class="pause-symbol" aria-hidden="true">Ⅱ</p><h2>时间，停在这里。</h2><p>过去的你会等你回来。<br>点击继续，移动鼠标便可接着走。</p><button id="resume" class="primary">继续</button><button id="pauseRetry" class="text-button">重新来过</button></div>
-      </div>
-      <div id="reconnect" class="reconnect-note" hidden>点击画面里的实心光点，从刚才的地方继续。</div>
-      <div id="failureScreen" class="screen centered" hidden>
-        <div class="failure-card"><div class="duet-mark" aria-hidden="true"><i></i><i></i></div><h2>只是，错过了一瞬。</h2><p>再留一束光给过去。<br>下一次，我们会相遇。</p><button id="failureRetry" class="primary">重试</button></div>
-      </div>
-      <div id="completeScreen" class="screen centered" hidden>
-        <div class="complete-card"><span class="completion-mark" aria-hidden="true"></span><p id="completeSmall" class="micro"></p><h2 id="completeTitle"></h2><p id="completeText"></p><button id="next" class="primary">下一个瞬间 <span aria-hidden="true">↗</span></button></div>
-      </div>
-      <div id="endingScreen" class="screen centered" hidden>
-        <div class="ending-card"><div class="duet-mark" aria-hidden="true"><i></i><i></i></div><h2>原来，你一直都在。</h2><p>每一次停留，<br>都成为了后来自己的依靠。</p><button id="again" class="primary">再合作一次 <span aria-hidden="true">↗</span></button><p class="micro">八段时间，一个你。</p></div>
-      </div>
-      <section id="levelMenu" class="level-menu" aria-label="选择章节" hidden><h2>八个瞬间</h2><div id="levelItems"></div><p>从愚者的启程，到世界的回环。依次解锁，随时重返。</p><button id="closeLevels">返回</button></section>
-    </section>
-
-    <footer><div class="legend"><span><i class="dot now"></i>现在的你</span><span><i class="dot echo"></i>两秒前的你</span></div><p id="footerText">一点过去，一点现在。</p><span class="edition">EIGHT MOMENTS / 八章</span></footer>
-  </main>
-  <noscript>这个游戏需要启用 JavaScript。请使用 PC 版 Chrome 或 Edge 打开。</noscript>
-  <script src="core.js"></script><script src="render.js"></script><script src="app.js"></script>
+      <p class="intro">循着八张牌的微光，与两秒前的自己，<br>走过这一夜。</p>
+      <div class="title-actions"><button id="start" class="primary" data-symbol="愚者">开始旅程</button><button id="continueGame" data-symbol="continue" disabled><span id="continueLabel">继续旅程</span></button><button id="titleLevels" data-symbol="chapters">选择牌章</button></div>
+      <p id="inputNote" class="micro">只需鼠标 · 没有倒计时 · 不必急着抵达</p>
+      <div class="community-actions"><button id="commentsButton" data-symbol="message">留下微光</button><button id="likeButton" data-symbol="like" aria-pressed="false"><span id="likeLabel">点赞 · 暂未开放</span></button></div>
+    </div>
+    <p class="title-note">移动光点，让两秒前的你回应。</p>
+  </section>
+  <section id="gameHeading" class="game-heading" hidden><span id="levelNumber" class="level-number"></span><div><h1 id="levelTitle"></h1><p id="levelTheme"></p><p id="levelTask" class="task"></p></div><span id="phaseLabel" class="phase-label"></span></section>
+  <section id="gameBottom" class="game-bottom" hidden><p id="status" role="status"></p><div class="button-row"><button id="hintButton" data-symbol="星星" hidden>启示</button><button id="retry" data-symbol="retry">重试本阵</button><button id="pause" data-symbol="pause">暂停</button></div></section>
+  <aside id="hint" class="hint-panel" hidden><h2>夜的启示</h2><p id="hintText"></p><div class="button-row"><button id="hintNext" data-symbol="continue">展示下一步</button><button id="closeHint" data-symbol="close">收起</button></div></aside>
+  <section id="pauseScreen" class="screen centered scrim" hidden aria-labelledby="pauseTitle"><div class="ritual-panel"><div class="panel-sigil" data-symbol="月亮"></div><h2 id="pauseTitle">时间，停在这里。</h2><p>过去的你会等你回来。<br>继续后，光点会回到刚才的位置。</p><div class="stack"><button id="resume" class="primary" data-symbol="continue">继续旅程</button><button id="pauseRetry" data-symbol="retry">重试本阵</button><button id="pauseHome" data-symbol="back">返回首页</button></div></div></section>
+  <section id="completeScreen" class="screen centered scrim" hidden aria-labelledby="completeTitle"><div class="ritual-panel"><div id="completeSigil" class="panel-sigil"></div><h2 id="completeTitle"></h2><p id="completeText"></p><button id="next" class="primary" data-symbol="continue"><span id="nextLabel">翻开下一张牌</span></button></div></section>
+  <section id="endingScreen" class="screen centered scrim" hidden aria-labelledby="endingTitle"><div class="ritual-panel ending"><div class="duet-mark"><i></i><i></i></div><h2 id="endingTitle">原来，你一直都在。</h2><p>不必抹去走过的弯路，<br>也不必成为另一个人。<br>过去与现在，都是完整的你。</p><div id="collected" class="collected"></div><div class="button-row"><button id="again" class="primary" data-symbol="愚者">再走一程</button><button id="endingHome" data-symbol="back">返回首页</button></div></div></section>
+  <section id="levelMenu" class="screen chapter-screen scrim" hidden aria-labelledby="chaptersTitle"><div class="chapter-header"><div><h2 id="chaptersTitle">今夜的八张牌</h2><p>从愚者的出发，到世界的回环。已抵达的牌章，随时重温。</p></div><button id="closeLevels" data-symbol="back">返回</button></div><div id="levelItems" class="chapter-grid"></div></section>
+  <section id="community" class="screen community-screen scrim" hidden aria-labelledby="communityTitle"><div class="community-panel"><div class="chapter-header"><div><h2 id="communityTitle">留下微光</h2><p>把此刻想说的话，留给下一个路过的人。</p></div><button id="closeCommunity" data-symbol="close">返回</button></div><p id="communityStatus" class="service-status" role="status">正在连接夜色里的留言……</p><form id="commentForm"><label for="nickname">称呼 <small>可选 · 最多 16 字</small></label><input id="nickname" name="nickname" maxlength="32" autocomplete="nickname" placeholder="一位过客"><label for="commentBody">留言 <small>最多 300 字 · 提交后公开可见</small></label><textarea id="commentBody" name="body" rows="3" maxlength="600" required placeholder="此刻，你想留下什么？"></textarea><button id="submitComment" type="submit" class="primary" data-symbol="message">送出微光</button></form><div id="commentList" class="comment-list" aria-label="公开留言"></div><button id="moreComments" data-symbol="continue" hidden>更多留言</button></div></section>
+  <section id="touchControls" class="touch-controls" hidden aria-label="触屏游戏控制"><div id="touchPad" class="touch-pad" role="group" aria-label="滑动此处移动青色光点"><span data-symbol="世界"></span><span>滑动光域，移动自己</span><small>也可轻触场景选择去处</small></div><button id="touchConfirm" class="primary touch-confirm" data-symbol="太阳"><span>确认<small>按住注能</small></span></button></section>
+  <footer><div class="legend"><span><i class="now"></i>现在的你</span><span><i class="echo"></i>两秒前的你</span></div><span id="footerText">一点过去，一点现在。</span><span>八张牌 · 一个你</span></footer>
+</main>
+<div id="virtualCursor" aria-hidden="true"><i></i></div>
+<noscript>这个游戏需要 JavaScript。请使用 PC 版 Chrome 或 Edge 打开。</noscript>
+<script src="rules.js"></script><script src="core.js"></script><script src="symbols.js"></script><script src="render.js"></script><script src="community-config.js"></script><script src="community.js"></script><script src="app.js"></script>
 </body>
 </html>
