@@ -10,7 +10,7 @@ async function run(channel,mobile=false){
  const tap=async el=>mobile?el.tap():el.click();await tap(p.locator('#titleLevels'));await tick(.5);await tap(p.locator('#levelItems button').nth(5));await tick(.6);
  const state=()=>p.evaluate(()=>({phase:__moon.g.state.phase,open:__moon.g.open,won:__moon.g.won,memory:__moon.g.view.moonMemory,action:__moon.g.view.actionLabel}));
  async function move(v,seconds){const q=await p.evaluate(v=>({x:__moon.r.ox+v.x*__moon.r.scale,y:__moon.r.oy+v.y*__moon.r.scale}),v);if(mobile)await p.touchscreen.tap(q.x,q.y);else await p.mouse.move(q.x,q.y);await tick(seconds);}
- async function click(){if(mobile)await p.locator('#touchConfirm').tap();else{await p.mouse.down();await p.mouse.up();}await tick(.02);}
+ async function click(){if(mobile)await p.locator('#touchPad').tap();else{await p.mouse.down();await p.mouse.up();}await tick(.02);}
  const label=channel+(mobile?'-mobile':'');
  for(let phase=0;phase<3;phase++){
    await tick(.5);assert.deepEqual((await state()).memory,{concealed:false,target:R.moonTargets[phase]});

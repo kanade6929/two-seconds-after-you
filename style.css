@@ -118,13 +118,13 @@ form button{justify-self:start;margin:7px 0 16px}
 *{scrollbar-width:thin;scrollbar-color:#668394 #101b29}
 .reduced *{animation:none!important;transition-duration:.05s!important}
 .touch-controls{position:fixed;z-index:8;left:14px;right:14px;bottom:calc(35px + env(safe-area-inset-bottom));display:flex;gap:12px;height:126px;touch-action:none}
-.touch-pad{flex:1;border:1px solid var(--line);background:#142636;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:7px;color:var(--cyan);user-select:none;touch-action:none}
+.touch-pad{flex:1;width:100%;border:1px solid #87b6b7;background:#142636;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:7px;color:var(--cyan);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none}
 .touch-pad svg{width:24px;height:24px;color:var(--gold)}
 .touch-pad small{font-size:11px;color:var(--muted)}
-.touch-confirm{width:96px;flex-direction:column;touch-action:none;user-select:none}
-.touch-confirm svg{width:32px;height:32px}
-.touch-confirm small{display:block;font-size:11px;margin-top:8px;color:var(--muted)}
 .touch-mode button:active{background:#30525a;color:var(--cyan);border-color:var(--cyan)}
+.touch-mode .touch-pad[data-gesture="moving"]{background:#203d48;border-color:var(--cyan)}
+.touch-mode .touch-pad[data-gesture="holding"]{background:#34352d;border-color:var(--gold);color:var(--gold)}
+.touch-pad[data-gesture="holding"] svg{color:var(--gold)}
 .touch-mode #canvas{touch-action:none}
 .touch-mode #virtualCursor{display:none}
 .touch-mode.light-cursor #virtualCursor{display:block}
@@ -190,7 +190,7 @@ form button{justify-self:start;margin:7px 0 16px}
 .touch-mode .title-actions{display:flex;max-width:none}.touch-mode .title-actions #start{min-height:44px}.touch-mode .intro{margin-top:14px}
 .touch-mode .game-heading{top:65px;left:16px;right:auto;width:216px;gap:9px}.touch-mode .level-number{font-size:21px;min-width:35px}.touch-mode .game-heading h1{font-size:26px}.touch-mode .game-heading #levelTheme{display:none}.touch-mode .game-heading .task{font-size:13px;line-height:1.7;margin-top:7px}
 .touch-mode .game-bottom{left:16px;right:auto;width:216px;bottom:16px}.touch-mode .game-bottom p{font-size:12px;line-height:1.6;min-height:0}.touch-mode .game-bottom .button-row{justify-content:flex-start;gap:6px}.touch-mode .game-bottom button{padding:8px;font-size:12px}.touch-mode .game-bottom button svg{width:17px}
-.touch-mode .touch-controls{left:248px;right:14px;bottom:12px;height:98px}.touch-mode .touch-pad{gap:5px;font-size:13px}.touch-mode .touch-pad svg{width:19px;height:19px}.touch-mode .touch-confirm{width:95px}
+.touch-mode .touch-controls{left:248px;right:14px;bottom:12px;height:98px}.touch-mode .touch-pad{gap:5px;font-size:13px}.touch-mode .touch-pad svg{width:19px;height:19px}
 .touch-mode.touch-playing footer{display:none}.touch-mode .hint-panel{left:245px;right:15px;bottom:120px;max-height:calc(100vh - 190px)}
 .touch-mode .centered{padding:75px 25px 25px;align-items:flex-start}.touch-mode .ritual-panel{max-width:600px;padding:20px}.touch-mode .ritual-panel p{margin:12px 0}.touch-mode .panel-sigil{display:none}.touch-mode .stack{display:flex;max-width:none;justify-content:center}.touch-mode .chapter-grid{grid-template-columns:repeat(4,1fr)}
 }

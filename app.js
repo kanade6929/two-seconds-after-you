@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const {Game,Timeline,Follower,LEVELS,STEP,readProgress}=EchoCore,$=id=>document.getElementById(id);
+  const {Game,Timeline,Follower,TouchGesture,LEVELS,STEP,readProgress}=EchoCore,$=id=>document.getElementById(id);
   const renderer=new EchoRenderer($('canvas')),saveKey='two-seconds-after-you.arcana.v2';
   function read(key){try{return JSON.parse(localStorage.getItem(key))||{};}catch{return {};}}
   const old=read('two-seconds-after-you.v1'),saved=read(saveKey),progress=readProgress(saved);
@@ -9,7 +9,10 @@
   const follower=new Follower(raw),cursor=$('virtualCursor');
   let last=performance.now(),accumulator=0,titleTime=0,titleTimeline=new Timeline(),celebration=0,resumeAge=0,resumePlaced=false,returnMode='title',hintTier=0;
   let audio=null,lastRevision=0,paintElapsed=0,lastPaint=0,paintMode='';const transitions=new Map();
-  let touchMode=window.matchMedia('(pointer: coarse)').matches,touchDrag=null,touchHoldId=null;document.body.classList.toggle('touch-mode',touchMode);
+  let touchMode=window.matchMedia('(pointer: coarse)').matches,touchDrag=null;const touchGesture=new TouchGesture();document.body.classList.toggle('touch-mode',touchMode);
+  function touchFeedback(){const state=touchGesture.id===null?'idle':touchGesture.dragging?'moving':touchGesture.held?'holding':'pending';if($('touchPad').dataset.gesture!==state)$('touchPad').dataset.gesture=state;}
+  function resetTouch(){touchDrag=null;touchGesture.cancel();down=false;touchFeedback();}
+  function confirmTouch(){if(mode!=='play'||game.transition)return;const wasOpen=game.open;game.update(0,{...game.point,down:false},true);afterUpdate(wasOpen);}
   function icon(el,name){el.prepend(ArcanaSymbols.svg(name,document));}
   document.querySelectorAll('[data-symbol]').forEach(el=>icon(el,el.dataset.symbol));
   function visible(id,on){
@@ -33,7 +36,7 @@
   }
   function lightCursor(){return ['play','resuming','celebrate'].includes(mode);}
   function show(next){
-    mode=next;down=false;touchDrag=null;touchHoldId=null;pressed?.classList.remove('virtual-down');pressed=null;
+    mode=next;resetTouch();pressed?.classList.remove('virtual-down');pressed=null;
     hovered?.classList.remove('virtual-hover');hovered=null;document.body.classList.toggle('light-cursor',lightCursor());
     const mapping={titleScreen:'title',pauseScreen:'paused',completeScreen:'complete',endingScreen:'ending',levelMenu:'menu',community:'community'};
     for(const[id,m]of Object.entries(mapping))visible(id,mode===m);
@@ -63,12 +66,13 @@
     $('completeSigil').replaceChildren(ArcanaSymbols.svg(game.level.title,document));$('completeTitle').textContent=game.level.title+' · 已抵达';$('completeText').textContent=game.level.done;$('nextLabel').textContent=game.index===7?'与自己相逢':'翻开下一张牌';celebration=0;show('celebrate');tone(130.81,1,.04);tone(523.25,.9,.035);tone(783.99,1.1,.018);
   }
   function afterUpdate(wasOpen){
-    if(game.revision!==lastRevision){lastRevision=game.revision;checkpoint();hintTier=0;visible('hint',false);tone(659.25,.45);}
+    if(game.revision!==lastRevision){lastRevision=game.revision;resetTouch();checkpoint();hintTier=0;visible('hint',false);tone(659.25,.45);}
     else if(!wasOpen&&game.open)tone(523.25,.3);
     if(game.won)win();
   }
   function step(){
-    if(mode==='play'&&game.transition){game.update(STEP,game.point);follower.reset(game.point);down=false;return;}
+    if(mode==='play'&&game.transition){resetTouch();game.update(STEP,game.point);follower.reset(game.point);return;}
+    if(mode==='play'&&touchGesture.id!==null){down=touchGesture.step(STEP);touchFeedback();}
     if(touchMode&&mode==='play'&&renderer.sceneBounds){const b=renderer.sceneBounds;raw.x=Math.max(b.x+8,Math.min(b.x+b.width-8,raw.x));raw.y=Math.max(b.y+8,Math.min(b.y+b.height-8,raw.y));}
     const p=follower.update(STEP,{...raw,down});
     if(mode==='resuming'){
@@ -103,13 +107,12 @@
   }
   // Menus keep native pointer/focus/selection. Only a gameplay gesture is routed
   // through the light; remember its origin even if pointerup opens a native menu.
-  document.addEventListener('pointermove',e=>{if(e.pointerType==='touch'){if(touchDrag?.id===e.pointerId){if(touchDrag.pad){raw.x+=(e.clientX-touchDrag.x)/renderer.scale;raw.y+=(e.clientY-touchDrag.y)/renderer.scale;}else raw={...renderer.point(e),down:false};touchDrag.x=e.clientX;touchDrag.y=e.clientY;}return;}raw={...renderer.point(e),down:false};inside=true;if(!seen){seen=true;if(!lightCursor())follower.reset(raw);document.body.classList.add('cursor-ready');}updateCursor();});
+  document.addEventListener('pointermove',e=>{if(e.pointerType==='touch'){if(touchGesture.id===e.pointerId){const delta=touchGesture.move(e.pointerId,e.clientX,e.clientY);if(delta){raw.x+=delta.x/renderer.scale;raw.y+=delta.y/renderer.scale;down=false;}touchFeedback();}else if(touchDrag?.id===e.pointerId)raw={...renderer.point(e),down:false};return;}raw={...renderer.point(e),down:false};inside=true;if(!seen){seen=true;if(!lightCursor())follower.reset(raw);document.body.classList.add('cursor-ready');}updateCursor();});
   document.addEventListener('pointerdown',e=>{
     if(e.pointerType==='touch'){
       if(!touchMode){touchMode=true;document.body.classList.add('touch-mode');visible('touchControls',mode==='play');document.body.classList.toggle('touch-playing',mode==='play');controls();}
       seen=true;inside=true;document.body.classList.add('cursor-ready');unlockAudio();
-      if(e.target.closest('#touchConfirm')){e.preventDefault();if(mode==='play'){touchHoldId=e.pointerId;down=true;const wasOpen=game.open;game.update(0,{...game.point,down:true},true);afterUpdate(wasOpen);}return;}
-      const pad=e.target.closest('#touchPad');if(mode==='play'&&(pad||e.target===$('canvas'))){e.preventDefault();e.target.setPointerCapture(e.pointerId);touchDrag={id:e.pointerId,pad:!!pad,x:e.clientX,y:e.clientY};if(!pad)raw={...renderer.point(e),down:false};return;}
+      const pad=e.target.closest('#touchPad');if(pad||e.target===$('canvas')){e.preventDefault();if(mode!=='play'||game.transition||touchGesture.id!==null||touchDrag)return;e.target.setPointerCapture(e.pointerId);if(pad){touchGesture.start(e.pointerId,e.clientX,e.clientY);touchFeedback();}else{touchDrag={id:e.pointerId};raw={...renderer.point(e),down:false};}return;}
       return;
     }
     if(e.button!==0)return;mouseGestureIsLight=lightCursor();unlockAudio();if(!mouseGestureIsLight)return;
@@ -120,12 +123,14 @@
     if(mode==='play'){down=true;const wasOpen=game.open;game.update(0,{...game.point,down:true},true);afterUpdate(wasOpen);}
   },true);
   window.addEventListener('pointerup',e=>{
-    if(e.pointerType==='touch'){if(touchHoldId===e.pointerId){down=false;touchHoldId=null;}if(touchDrag?.id===e.pointerId)touchDrag=null;return;}
+    if(e.pointerType==='touch'){if(touchGesture.id===e.pointerId){const tap=touchGesture.end(e.pointerId);down=false;touchFeedback();if(tap)confirmTouch();}if(touchDrag?.id===e.pointerId)touchDrag=null;return;}
     if(e.button!==0||!mouseGestureIsLight)return;down=false;const hit=mode==='play'?interactive():null,target=pressed;pressed?.classList.remove('virtual-down');pressed=null;
     if(target&&target===hit&&target.matches('button')){dispatching=true;try{target.click();}finally{dispatching=false;}}
   },true);
-  document.addEventListener('click',e=>{if(e.target.closest('#touchConfirm')){e.preventDefault();return;}if(!touchMode&&!dispatching&&e.detail!==0&&(mouseGestureIsLight||lightCursor())){e.preventDefault();e.stopImmediatePropagation();}},true);
-  window.addEventListener('pointercancel',()=>{touchDrag=null;touchHoldId=null;down=false;pressed?.classList.remove('virtual-down');pressed=null;});
+  document.addEventListener('click',e=>{if(e.target.closest('#touchPad')){e.preventDefault();if(e.detail===0)confirmTouch();return;}if(!touchMode&&!dispatching&&e.detail!==0&&(mouseGestureIsLight||lightCursor())){e.preventDefault();e.stopImmediatePropagation();}},true);
+  function cancelPointer(e){if(touchGesture.id===e.pointerId||touchDrag?.id===e.pointerId)resetTouch();if(e.pointerType!=='touch'){down=false;pressed?.classList.remove('virtual-down');pressed=null;}}
+  window.addEventListener('pointercancel',cancelPointer);window.addEventListener('lostpointercapture',cancelPointer);
+  $('touchPad').addEventListener('contextmenu',e=>e.preventDefault());
   document.addEventListener('wheel',e=>{if(touchMode||!lightCursor())return;let el=atCursor();while(el&&el!==document.body){if(el.scrollHeight>el.clientHeight&&/auto|scroll/.test(getComputedStyle(el).overflowY)){e.preventDefault();el.scrollBy(0,e.deltaY);return;}el=el.parentElement;}},{passive:false});
   document.documentElement.addEventListener('pointerleave',e=>{if(e.pointerType==='touch')return;inside=false;pause();});window.addEventListener('blur',pause);
   document.addEventListener('visibilitychange',()=>{if(document.hidden){pause();accumulator=0;}last=performance.now();});window.addEventListener('resize',()=>{renderer.resize();pause();});

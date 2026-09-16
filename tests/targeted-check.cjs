@@ -12,7 +12,7 @@ async function run(mobile){
  const state=()=>p.evaluate(()=>({t:__view.g.t,phase:__view.g.state.phase,fade:__view.g.transition?.remaining,point:__view.g.point,open:__view.g.open,turns:__view.g.state.turns,won:__view.g.won}));
  async function button(id){if(mobile)await p.locator('#'+id).tap();else await p.locator('#'+id).click();await tick(.6);}
  async function move(v,seconds){const q=await p.evaluate(v=>({x:__view.r.ox+v.x*__view.r.scale,y:__view.r.oy+v.y*__view.r.scale}),v);if(mobile)await p.touchscreen.tap(q.x,q.y);else await p.mouse.move(q.x,q.y);await tick(seconds);}
- async function click(){if(mobile)await p.locator('#touchConfirm').tap();else{await p.mouse.down();await p.mouse.up();}}
+ async function click(){if(mobile)await p.locator('#touchPad').tap();else{await p.mouse.down();await p.mouse.up();}}
  async function chapter(i){await button('titleLevels');const card=p.locator('#levelItems button').nth(i);if(mobile)await card.tap();else await card.click();await tick(.6);}
  const prefix=mobile?'target-mobile':'target-desktop';await chapter(3);await move(R.balancePads[2],3);await move(R.balancePads[4],.9);
  for(let n=0;n<100&&!(await state()).fade;n++)await tick(.008);

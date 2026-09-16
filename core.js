@@ -24,6 +24,20 @@
     }
   }
   function readProgress(raw={}){if(!raw||typeof raw!=='object')raw={};const max=LEVELS.length-1,completed=Array.isArray(raw.completed)?[...new Set(raw.completed.filter(n=>Number.isInteger(n)&&n>=0&&n<=max))]:[],unlocked=clamp(Math.max(0,...completed.map(n=>n+1),Number.isInteger(raw.unlocked)?raw.unlocked:0),0,max),current=clamp(Number.isInteger(raw.current)?raw.current:0,0,unlocked),checkpoints={};for(let i=0;i<LEVELS.length;i++){const c=raw.checkpoints?.[i];if(c&&Number.isInteger(c.phase)&&c.phase>=0&&c.phase<=8)checkpoints[i]={phase:Math.min(c.phase,LEVELS[i].phases-1),...(i===7?{turns:Rules.worldRestore(c.turns)}:{})};}return {completed,unlocked,current,started:raw.started===true||completed.length>0,checkpoints};}
+  // One thumb surface: tap confirms, drag moves, a still press holds.
+  // Distances are CSS pixels, so touch slop is independent of the game camera.
+  class TouchGesture{
+    constructor(){this.cancel();}
+    cancel(){this.id=null;this.age=0;this.dragging=false;this.held=false;}
+    start(id,x,y){if(this.id!==null)return false;this.id=id;this.x=this.startX=x;this.y=this.startY=y;this.age=0;this.dragging=false;this.held=false;return true;}
+    move(id,x,y){
+      if(this.id!==id)return null;
+      if(!this.dragging&&Math.hypot(x-this.startX,y-this.startY)<=8)return null;
+      this.dragging=true;this.held=false;const delta={x:x-this.x,y:y-this.y};this.x=x;this.y=y;return delta;
+    }
+    step(dt){if(this.id!==null&&!this.dragging){this.age+=dt;if(this.age>=.22-1e-8)this.held=true;}return this.held;}
+    end(id){if(this.id!==id)return false;const tap=!this.dragging&&!this.held;this.cancel();return tap;}
+  }
   class Game{
     constructor(index=0,checkpoint={}){this.index=index;this.level=LEVELS[index];this.state=Rules.create(index,checkpoint);this.point={...this.level.spawn,down:false};this.echo=null;this.t=0;this.timeline=new Timeline();this.timeline.add(0,this.point);this.timers={};this.contacts={};this.hold=0;this.need=.3;this.open=false;this.won=false;this.ready=false;this.winOrigin={...this.point};this.revision=0;this.progressAt=0;this.effect={};this.blocked=false;this.view=Rules.view(this);}
     update(dt,input,click=false){
@@ -39,5 +53,5 @@
     checkpoint(){return {phase:this.state.phase,...(this.level.id==='world'?{turns:[...this.state.turns]}:{})};}
     status(){return this.view.message;}
   }
-  const api={STEP,DELAY,HOLD,WIDTH,HEIGHT,MAX_SPEED,MAX_ACCEL,LEVELS,Rules,distance,segmentDistance,Timeline,Follower,Game,readProgress};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.EchoCore=api;
+  const api={STEP,DELAY,HOLD,WIDTH,HEIGHT,MAX_SPEED,MAX_ACCEL,LEVELS,Rules,distance,segmentDistance,Timeline,Follower,TouchGesture,Game,readProgress};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.EchoCore=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
