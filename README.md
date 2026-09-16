@@ -46,6 +46,10 @@
 
 ## 发布
 
-`deploy.mjs` 从环境变量读取 Netlify 授权，通过系统 Git 凭据管理器读取 GitHub 授权；不在源码中保存密钥。`--check` 检查授权，`--create` 创建独立仓库/站点，`--publish` 将五个游戏运行文件上传到草稿部署、发布并校验线上哈希。部署记录 `.deployment.local.json` 已在 Git 中忽略。线上只发布入口、样式和三个 JS 文件。
+正式网站使用 GitHub Pages：https://kanade6929.github.io/two-seconds-after-you/ 。推送 `main` 后，GitHub Actions 自动运行测试，通过后只发布入口、样式和三个 JS 文件。测试失败不会更新网站。代码、测试和发布脚本都保存在 GitHub 仓库，部署无需另一个托管平台。
+
+`pages.mjs --status` 查看 Pages 与工作流状态，`--verify` 校验线上五个运行文件与本地内容一致；`--enable` 仅用于初次启用此仓库的 Pages。GitHub 授权从系统 Git 凭据管理器读取，不写入源码。
+
+`deploy.mjs` 是先前准备的 Netlify 备用脚本，本次未使用。部署记录 `.deployment.local.json` 已在 Git 中忽略。
 
 本作以 PC 鼠标为目标设备；窄屏可显示，但不承诺手机触屏玩法。建议使用至少 960 × 640 的浏览器窗口。
