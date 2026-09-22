@@ -61,7 +61,7 @@ test('all eight real renderer scenes execute with smooth activation and extingui
 });
 test('door ripple covers distant viewport corners including ultrawide letterboxing',()=>{
   for(const [w,h]of[[1920,1080],[2560,1080],[900,1200]]){
-    const {r}=renderer(w,h),origin={x:975,y:320},radii=[];r.polygon=(x,y,r)=>radii.push(r);r.ripple(origin,1.05,false);
+    const {r}=renderer(w,h),origin={x:975,y:320},radii=[];r.circle=(x,y,r)=>radii.push(r);r.ripple(origin,1.65,false);
     const far=Math.max(...[[0,0],[w,0],[0,h],[w,h]].map(([x,y])=>Math.hypot((x-r.ox)/r.scale-origin.x,(y-r.oy)/r.scale-origin.y)));
     assert.ok(Math.max(...radii)>far);
   }
@@ -69,6 +69,16 @@ test('door ripple covers distant viewport corners including ultrawide letterboxi
 test('particles are bounded and reduced-motion ripple avoids screen expansion',()=>{
   const {r,stats}=renderer();for(let i=0;i<10;i++)r.burst({x:600,y:300},'#edbd88',60);assert.equal(r.particles.length,180);
   r.ripple({x:600,y:300},.2,true);assert.ok(Math.max(...stats.arcs)<100);
+});
+
+test('galaxy plates are cached and reduced-motion backgrounds have no rotating arcs',()=>{
+  const {r,stats}=renderer();r.atmosphere(0,true);const layers=stats.layers;
+  const before=stats.arcs.slice();stats.arcs=[];r.atmosphere(8,true,2);assert.deepEqual(stats.arcs,before);assert.equal(stats.layers,layers);
+  stats.arcs=[];r.atmosphere(8,false,2);assert.ok(stats.arcs.some(radius=>radius>100));assert.equal(stats.layers,layers);
+});
+test('small click ripples are bounded, fade out and restore compositing',()=>{
+  const {r,stats,ctx}=renderer();r.clickRipple({x:600,y:365},.5,'echo',false);assert.ok(Math.max(...stats.arcs)<70);
+  assert.equal(ctx.globalCompositeOperation,'source-over');stats.arcs=[];r.clickRipple({x:600,y:365},1.4,'now',false);assert.equal(stats.arcs.length,0);
 });
 
 test('click reminder follows live permission, never afterglow or a paused scene',()=>{

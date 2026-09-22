@@ -16,7 +16,7 @@ async function run(channel){
   if(i===5){await shot('moon-remember');await move(R.moonWell,3.2);await move(R.moonOptions[1],1.1);await shot('moon-hidden');await click();}
   if(i===6){await move(R.sunPads[1],3.2);await move(R.sunPads[2],1.1);await shot('realtime-sun');await advance(.9);}
   if(i===7){for(let k=0;k<4;k++){await move(R.worldVertices[k],3.2);await move(R.worldVertices[(k+1)%4],1.8);if(k===0)await shot('realtime-world');}}
-  assert.equal((await state()).won,true,R.LEVELS[i].title);await advance(1.3);
+  assert.equal((await state()).won,true,R.LEVELS[i].title);await advance(4.5);
   console.log(channel+': '+R.LEVELS[i].title+' input-only solve passed');await button('next');
  }
  assert.equal(await page.locator('#endingScreen').isVisible(),true);

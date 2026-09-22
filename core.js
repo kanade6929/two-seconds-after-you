@@ -38,6 +38,15 @@
     step(dt){if(this.id!==null&&!this.dragging){this.age+=dt;if(this.age>=.22-1e-8)this.held=true;}return this.held;}
     end(id){if(this.id!==id)return false;const tap=!this.dragging&&!this.held;this.cancel();return tap;}
   }
+  // Presentation events use game time, not wall time or sampled button edges.
+  // Even a press/release between two logic ticks receives exactly one echo.
+  class ClickFeedback{
+    constructor(){this.clear();}
+    clear(){this.time=0;this.pending=[];this.ripples=[];this.sounds=[];}
+    emit(p,t,role){const e={x:p.x,y:p.y,t,role};this.ripples.push(e);this.sounds.push(role);if(this.ripples.length>32)this.ripples.shift();if(this.sounds.length>16)this.sounds.shift();}
+    click(p,t){this.emit(p,t,'now');this.pending.push({x:p.x,y:p.y,t:t+DELAY});if(this.pending.length>32)this.pending.shift();}
+    advance(t){this.time=t;while(this.pending.length&&this.pending[0].t<=t+1e-7){const e=this.pending.shift();this.emit(e,e.t,'echo');}this.ripples=this.ripples.filter(e=>t-e.t<1.35);}
+  }
   class Game{
     constructor(index=0,checkpoint={}){this.index=index;this.level=LEVELS[index];this.state=Rules.create(index,checkpoint);this.point={...this.level.spawn,down:false};this.echo=null;this.t=0;this.timeline=new Timeline();this.timeline.add(0,this.point);this.timers={};this.contacts={};this.hold=0;this.need=1;this.open=false;this.won=false;this.ready=false;this.winOrigin={...this.point};this.revision=0;this.progressAt=0;this.effect={};this.blocked=false;this.memory=null;this.pending=null;this.history=[];const anchor=Rules.restoreAnchor(index,checkpoint);if(anchor)this.pending={...anchor,at:2};this.view=Rules.view(this);}
     update(dt,input,click=false){
@@ -48,16 +57,19 @@
       for(const [a,b]of walls){const hit=Rules.intersection(this.point,p,a,b);if(hit&&hit.t>1e-7&&(!nearest||hit.t<nearest.t))nearest=hit;}
       if(nearest){const dx=p.x-this.point.x,dy=p.y-this.point.y,n=Math.hypot(dx,dy)||1;p={x:nearest.x-dx/n*2,y:nearest.y-dy/n*2,down:p.down};this.blocked=true;}
       this.point=p;this.timeline.add(this.t,p);this.echo=this.timeline.at(this.t-DELAY);
+      if(!this.feedback)this.feedback=new ClickFeedback();
+      if(click)this.feedback.click(p,this.t);
+      this.feedback.advance(this.t);
       const before=click?this.snapshot():null,revision=this.revision;
       Rules.update(this,dt,click);
       if(this.index===1&&click&&this.revision!==revision){this.history.push(before);if(this.history.length>64)this.history.shift();}
     }
     checkpoint(){return Rules.checkpoint(this);}
     snapshot(){return {state:JSON.parse(JSON.stringify(this.state)),memory:this.memory&&{...this.memory},pending:this.pending&&{...this.pending,at:this.pending.at-this.t}};}
-    clearEcho(){this.memory=this.pending=this.echo=null;this.timeline=new Timeline();this.timeline.add(this.t,this.point);this.timers={};this.contacts={};this.hold=0;this.effect={};this.state.pourSamples=[];this.view=Rules.view(this);this.ready=this.open=false;}
+    clearEcho(){this.memory=this.pending=this.echo=null;this.feedback?.clear();this.timeline=new Timeline();this.timeline.add(this.t,this.point);this.timers={};this.contacts={};this.hold=0;this.effect={};this.state.pourSamples=[];this.view=Rules.view(this);this.ready=this.open=false;}
     undo(){if(this.won||this.index!==1)return false;const past=this.history.pop();if(!past)return false;this.state=past.state;this.state.error=0;this.clearEcho();this.revision++;this.progressAt=this.t;return true;}
     release(){if(this.won)return false;this.clearEcho();if(this.index===3)this.state.water=0;this.state.error=0;this.revision++;this.progressAt=this.t;this.view=Rules.view(this);return true;}
     status(){return this.view.message;}
   }
-  const api={STEP,DELAY,HOLD,WIDTH,HEIGHT,MAX_SPEED,MAX_ACCEL,LEVELS,Rules,distance,segmentDistance,Timeline,Follower,TouchGesture,Game,readProgress};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.EchoCore=api;
+  const api={STEP,DELAY,HOLD,WIDTH,HEIGHT,MAX_SPEED,MAX_ACCEL,LEVELS,Rules,distance,segmentDistance,Timeline,Follower,TouchGesture,ClickFeedback,Game,readProgress};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.EchoCore=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
