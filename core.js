@@ -41,10 +41,10 @@
   // Presentation events use game time, not wall time or sampled button edges.
   // Even a press/release between two logic ticks receives exactly one echo.
   class ClickFeedback{
-    constructor(){this.clear();}
+    constructor(){this.noteStep=0;this.clear();}
     clear(){this.time=0;this.pending=[];this.ripples=[];this.sounds=[];}
-    emit(p,t,role){const e={x:p.x,y:p.y,t,role};this.ripples.push(e);this.sounds.push(role);if(this.ripples.length>32)this.ripples.shift();if(this.sounds.length>16)this.sounds.shift();}
-    click(p,t){this.emit(p,t,'now');this.pending.push({x:p.x,y:p.y,t:t+DELAY});if(this.pending.length>32)this.pending.shift();}
+    emit(p,t,role){const e={x:p.x,y:p.y,t,role};this.ripples.push(e);this.sounds.push({role,note:p.note});if(this.ripples.length>32)this.ripples.shift();if(this.sounds.length>16)this.sounds.shift();}
+    click(p,t){const phrase=[74,78,81,83,81,78,76,78,81,78,76,74],note=phrase[this.noteStep];this.noteStep=(this.noteStep+1)%phrase.length;const event={x:p.x,y:p.y,note};this.emit(event,t,'now');this.pending.push({...event,t:t+DELAY});if(this.pending.length>32)this.pending.shift();}
     advance(t){this.time=t;while(this.pending.length&&this.pending[0].t<=t+1e-7){const e=this.pending.shift();this.emit(e,e.t,'echo');}this.ripples=this.ripples.filter(e=>t-e.t<1.35);}
   }
   class Game{

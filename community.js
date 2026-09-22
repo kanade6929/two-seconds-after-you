@@ -1,7 +1,7 @@
 (function(root){
   'use strict';
   class Community{
-    constructor(config={}){this.config=config||{};this.configured=!!this.config.url&&!!this.config.publishableKey;this.session=null;this.authPending=null;this.likePending=null;}
+    constructor(config={}){this.config=config||{};this.configured=!!this.config.url&&!!this.config.publishableKey;this.sessionKey='echo.community.session:'+String(this.config.url||'').replace(/\/$/,'');this.session=null;this.authPending=null;this.likePending=null;}
     async request(path,{method='GET',body,token,headers={}}={}){
       if(!this.configured)throw Error('Community is not configured');
       const c=new AbortController(),timer=setTimeout(()=>c.abort(),12000);
@@ -10,13 +10,13 @@
     async identity(){
       if(this.authPending)return this.authPending;
       this.authPending=(async()=>{
-        if(!this.session)try{this.session=JSON.parse(localStorage.getItem('echo.community.session'));}catch{}
+        if(!this.session)try{this.session=JSON.parse(localStorage.getItem(this.sessionKey));}catch{}
         if(this.session?.expires_at>Date.now()/1000+60)return this.session;
         let s;if(this.session?.refresh_token){try{s=await this.request('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:{refresh_token:this.session.refresh_token}});}catch{/* Expired anonymous session may establish a new identity. */}}
         if(!s)s=await this.request('/auth/v1/signup',{method:'POST',body:{data:{}}});
         if(!s.access_token||!s.user?.id)throw Error('Anonymous authentication unavailable');
         this.session={access_token:s.access_token,refresh_token:s.refresh_token,user:s.user,expires_at:s.expires_at||Date.now()/1000+s.expires_in};
-        try{localStorage.setItem('echo.community.session',JSON.stringify(this.session));}catch{}return this.session;
+        try{localStorage.setItem(this.sessionKey,JSON.stringify(this.session));}catch{}return this.session;
       })();try{return await this.authPending;}finally{this.authPending=null;}
     }
     async readComments(cursor=null){

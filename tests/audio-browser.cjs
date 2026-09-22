@@ -11,7 +11,8 @@ const {chromium}=require(process.env.ECHO_PLAYWRIGHT_MODULE||'playwright'),asser
  await p.goto('http://127.0.0.1:4173');await p.locator('#start').click();await p.clock.runFor(800);
  const move=async(x,y,s)=>{const q=await p.evaluate(({x,y})=>({x:__audioView.r.ox+x*__audioView.r.scale,y:__audioView.r.oy+y*__audioView.r.scale}),{x,y});await p.mouse.move(q.x,q.y);await p.clock.runFor(s*1000);};
  await move(600,470,2);await p.mouse.down();await p.mouse.up();await p.clock.runFor(2100);
- let stats=await p.evaluate(()=>({contexts:__sound.contexts,convolvers:__sound.convolvers,freq:__sound.freq,max:__sound.max}));assert.equal(stats.contexts,1);assert.equal(stats.convolvers,1);assert.ok(stats.freq.includes(880));assert.ok(stats.freq.includes(440));
+ let stats=await p.evaluate(()=>({contexts:__sound.contexts,convolvers:__sound.convolvers,freq:__sound.freq,max:__sound.max}));assert.equal(stats.contexts,1);assert.equal(stats.convolvers,1);assert.ok(stats.freq.some(f=>Math.abs(f-587.3295358)<.001));assert.ok(stats.freq.some(f=>Math.abs(f-293.6647679)<.001));
+ const offset=stats.freq.length;await p.mouse.down();await p.mouse.up();await p.clock.runFor(2100);const phrase=await p.evaluate(()=>__sound.freq);assert.ok(phrase.slice(offset).some(f=>Math.abs(f-739.988845)<.001));assert.ok(phrase.slice(offset).some(f=>Math.abs(f-369.9944227)<.001));
  await p.keyboard.press('Escape');await p.clock.runFor(700);await p.locator('#pauseHome').click();await p.clock.runFor(700);await p.locator('#sound').click();
  const before=await p.evaluate(()=>__sound.freq.length);await p.locator('#start').click();await p.clock.runFor(800);await move(600,470,2);await p.mouse.down();await p.mouse.up();await p.clock.runFor(2100);assert.equal(await p.evaluate(()=>__sound.freq.length),before);
  console.log('real Web Audio: one context/reverb, distinct current/echo pitches, mute prevents voices; listening quality not asserted');

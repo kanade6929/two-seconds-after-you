@@ -7,6 +7,8 @@ async function open(channel='chrome',saved=false){
  const browser=await chromium.launch({channel:mobile?'chrome':channel,headless:true});
  const context=await browser.newContext({viewport:mobile?(landscape?{width:844,height:390}:{width:390,height:844}):{width:1440,height:900},isMobile:mobile,hasTouch:mobile,deviceScaleFactor:mobile?3:1});
  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ // Gameplay regression is offline/deterministic; real service has its own opt-in test.
+ await page.route('**/community-config.js',r=>r.fulfill({contentType:'text/javascript',body:'window.ECHO_COMMUNITY_CONFIG={url:"",publishableKey:""}'}));
  await page.clock.install({time:new Date('2026-09-16T00:00:00Z')});await page.clock.pauseAt(new Date('2026-09-16T00:00:01Z'));
  await page.addInitScript(({save,key})=>{
   if(save&&!localStorage.getItem(key))localStorage.setItem(key,save);

@@ -1,4 +1,5 @@
 -- Run in a new Supabase project's SQL editor. No service key belongs in the website.
+begin;
 create table if not exists public.comments (
   id bigint generated always as identity primary key,
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -13,6 +14,7 @@ create table if not exists public.likes (
 alter table public.comments enable row level security;
 alter table public.likes enable row level security;
 revoke all on public.comments, public.likes from anon, authenticated;
+grant usage on schema public to authenticated;
 grant select on public.comments to authenticated;
 grant insert (user_id, nickname, body) on public.comments to authenticated;
 grant usage, select on sequence public.comments_id_seq to authenticated;
@@ -35,3 +37,4 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.community_likes() from public, anon;
 grant execute on function public.community_likes() to authenticated;
+commit;

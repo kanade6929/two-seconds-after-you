@@ -43,7 +43,7 @@
       }
     }catch{}
   }
-  function clickSounds(){if(!game?.feedback)return;for(const role of game.feedback.sounds.splice(0))tone(role==='echo'?440:880,.8,role==='echo'?.02:.024);}
+  function clickSounds(){if(!game?.feedback)return;for(const {role,note} of game.feedback.sounds.splice(0))tone(440*2**((note-69-(role==='echo'?12:0))/12),.8,role==='echo'?.018:.023);}
   function victorySound(){for(const [i,f] of [146.83,293.66,440,587.33,739.99].entries())tone(f,2.1,.018-i*.001,i*.16);}
   function controls(){
     $('inputNote').textContent=touchMode?'滑动与轻点 · 与两秒前的自己配合':'移动与点击 · 与两秒前的自己配合';
@@ -175,7 +175,7 @@
   let pageCursor=null,communityBusy=false;
   function communityState(text){$('communityStatus').textContent=text;}
   function renderComments(rows,append){if(!append)$('commentList').replaceChildren();for(const row of rows){const article=document.createElement('article');article.className='comment';const name=document.createElement('strong');name.textContent=row.nickname||'一位过客';const time=document.createElement('time');time.textContent=new Date(row.created_at).toLocaleDateString('zh-CN');const body=document.createElement('p');body.textContent=row.body;article.append(name,time,body);$('commentList').append(article);}}
-  async function readComments(append=false){if(communityBusy)return;communityBusy=true;$('moreComments').disabled=true;communityState('正在读取微光……');try{const result=await community.readComments(append?pageCursor:null);renderComments(result.rows,append);pageCursor=result.next;visible('moreComments',!!pageCursor);communityState(result.rows.length||append?'留言提交后会公开可见。':'还没有留言。愿你成为第一束光。');}catch{communityState('暂时连接不上留言服务。输入不会丢失，请稍后重试。');visible('moreComments',true);$('moreComments').textContent='重试读取';}finally{communityBusy=false;$('moreComments').disabled=false;}}
+  async function readComments(append=false){if(communityBusy)return;communityBusy=true;if(!append)pageCursor=null;$('moreComments').disabled=true;communityState('正在读取微光……');try{const result=await community.readComments(append?pageCursor:null);renderComments(result.rows,append);pageCursor=result.next;$('moreComments').textContent='更多留言';visible('moreComments',!!pageCursor);communityState(result.rows.length||append?'留言提交后会公开可见。':'还没有留言。愿你成为第一束光。');}catch{communityState('暂时连接不上留言服务。输入不会丢失，请稍后重试。');visible('moreComments',true);$('moreComments').textContent='重试读取';}finally{communityBusy=false;$('moreComments').disabled=false;}}
   $('commentsButton').onclick=()=>{checkpoint();show('community');if(community.configured)readComments();else{communityState(serviceMessage);for(const id of ['nickname','commentBody','submitComment'])$(id).disabled=true;}};
   $('closeCommunity').onclick=home;$('moreComments').onclick=()=>readComments(!!pageCursor);
   $('commentForm').addEventListener('submit',async e=>{e.preventDefault();if(communityBusy||!community.configured)return;const nickname=$('nickname').value.trim(),body=$('commentBody').value.trim();if(!body||[...nickname].length>16||[...body].length>300){communityState('请留下 1—300 字的留言，称呼不超过 16 字。');return;}communityBusy=true;$('submitComment').disabled=true;communityState('正在送出微光……');let sent=false;try{await community.submitComment(nickname,body);$('commentBody').value='';sent=true;tone(523.25);}catch{communityState('未能送出。内容已保留，请重试。');}finally{communityBusy=false;$('submitComment').disabled=false;}if(sent){await readComments();communityState('微光已送达，公开可见。');}});

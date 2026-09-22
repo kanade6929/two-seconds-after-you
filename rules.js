@@ -1,7 +1,7 @@
 (function(root){
   'use strict';
   const point=(x,y)=>({x,y}),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)),near=(a,b,r=40)=>!!a&&dist(a,b)<=r;
-  const NODE_RADIUS=40,RELEASE_RADIUS=46;
+  const NODE_RADIUS=44,RELEASE_RADIUS=49,SETTLE_TIME=.16,PAIR_TIME=.35;
   function segmentDistance(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,t=clamp(((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1));return dist(p,point(a.x+t*dx,a.y+t*dy));}
   function intersection(a,b,c,d){const rx=b.x-a.x,ry=b.y-a.y,sx=d.x-c.x,sy=d.y-c.y,den=rx*sy-ry*sx;if(Math.abs(den)<1e-9)return null;const t=((c.x-a.x)*sy-(c.y-a.y)*sx)/den,u=((c.x-a.x)*ry-(c.y-a.y)*rx)/den;return t>=0&&t<=1&&u>=0&&u<=1?{t,x:a.x+t*rx,y:a.y+t*ry}:null;}
   function nodeContains(p,center,radius=NODE_RADIUS){if(!p)return false;const x=Math.abs(p.x-center.x),y=Math.abs(p.y-center.y);return Math.max(x,y,(x+y)/Math.SQRT2)<=radius*Math.cos(Math.PI/8)+1e-7;}
@@ -37,10 +37,10 @@
   function fail(g,message){g.state.message=message;g.state.error=2.5;}
   function complete(g,origin){g.won=true;g.winOrigin={...origin};g.open=g.ready=false;}
   function sustain(g,key,condition,dt,seconds){g.timers[key]=condition?(g.timers[key]||0)+dt:0;return g.timers[key]+1e-8>=seconds;}
-  function at(g,key,p,center,dt){const inside=occupy(g,key,p,center);return sustain(g,key+'-settle',inside,dt,.25);}
+  function at(g,key,p,center,dt){const inside=occupy(g,key,p,center);return sustain(g,key+'-settle',inside,dt,SETTLE_TIME);}
   function update(g,dt,click){
     const s=g.state,id=g.level.id,p=g.point,e=g.echo;g.memory=g.pending=null;s.error=Math.max(0,s.error-dt);g.effect={};g.hold=0;g.need=1;
-    const held=(key,p,center)=>at(g,key,p,center,dt),pair=(condition,seconds=.5)=>{const done=sustain(g,'cooperate',condition,dt,seconds);g.hold=g.timers.cooperate;g.need=seconds;return done;};
+    const held=(key,p,center)=>at(g,key,p,center,dt),pair=(condition,seconds=PAIR_TIME)=>{const done=sustain(g,'cooperate',condition,dt,seconds);g.hold=g.timers.cooperate;g.need=seconds;return done;};
     if(id==='fool'){const power=held('lamp',e,g.level.seal),arrived=held('exit',p,g.level.exit);g.effect={power,arrived};if(click&&nodeContains(p,g.level.exit)){if(power&&arrived)complete(g,g.level.exit);else fail(g,'星门需要昔光仍在旅灯；回去停一下，再试一次。');}}
     if(id==='magician'){if(click){const i=magic.mirrors.findIndex(m=>nodeContains(p,m));if(i>=0){s.orientations[i]=(s.orientations[i]+1)%3;changed(g);}}const power=held('source',e,magic.source),beam=traceMagic(0,s.orientations),arrived=held('receiver',p,magic.receiver);g.effect={power,arrived,beam};if(click&&nodeContains(p,magic.receiver)){if(power&&beam.hit&&arrived)complete(g,magic.receiver);else fail(g,'昔光供能、两枚折印和接收位置，需要同时成立。');}}
     if(id==='lovers'){const past=held('pastSeal',mirrorPoint(e),loversSeals[0]),now=held('nowSeal',mirrorPoint(p),loversSeals[1]);g.effect={past,now};if(pair(past&&now))complete(g,point(600,355));}
@@ -51,12 +51,12 @@
       const future=s.pourSamples.reduce((n,v)=>n+(v.on?v.dt*FLOW:0),0),restNow=held('rest-now',p,rest),restPast=held('rest-past',e,rest),calm=restNow&&restPast,enough=s.water>=TARGET[0]&&s.water<=TARGET[1];
       g.effect={now,past,future,forecast:Math.min(120,s.water+future),calm,enough};
       if(click&&nodeContains(p,vessel)){s.water=0;s.pourSamples=[];g.timeline.samples=[];g.timeline.add(g.t,p);g.echo=null;g.contacts={};g.timers={};changed(g);fail(g,'水杯已放空，旧注水记录也已清除。');}
-      else if(pair(enough&&!now&&!past&&calm,.6))complete(g,vessel);
+      else if(pair(enough&&!now&&!past&&calm,.45))complete(g,vessel);
     }
-    if(id==='star'){const li=starLeft.findIndex((v,i)=>occupy(g,'left'+i,e,v)),ri=starRight.findIndex((v,i)=>occupy(g,'right'+i,p,v));const connected=li>=0&&ri>=0,hit=connected&&targetStars.every(v=>segmentDistance(v,e,p)<=13);g.effect={li,ri,connected,hit};if(pair(hit,.5))complete(g,point(600,350));}
+    if(id==='star'){const li=starLeft.findIndex((v,i)=>occupy(g,'left'+i,e,v)),ri=starRight.findIndex((v,i)=>occupy(g,'right'+i,p,v));const connected=li>=0&&ri>=0,hit=connected&&targetStars.every(v=>segmentDistance(v,e,p)<=18);g.effect={li,ri,connected,hit};if(pair(hit))complete(g,point(600,350));}
     if(id==='moon'){const power=held('well',e,moonWell);g.effect={power};if(click){const i=moonOptions.findIndex(v=>nodeContains(p,v));if(i>=0){if(!power)fail(g,'昔光尚未守住月井，先回井边停一下。');else if(i===moonAnswer)complete(g,moonOptions[i]);else fail(g,'不是这个倒影。等昔光离井后，可以重新看真纹。');}}}
-    if(id==='sun'){const left=sunRay(e,0),right=sunRay(p,1);g.effect={left:left.lit,right:right.lit,rays:[left.line,right.line].filter(Boolean)};if(pair(left.lit&&right.lit,.6))complete(g,point(600,350));}
-    if(id==='world'){const from=s.links,to=(from+1)%4,past=held('world-past',e,worldVertices[from]),now=held('world-now',p,worldVertices[to]);g.effect={past,now,from,to};if(pair(past&&now,.5)){if(from===3)complete(g,worldVertices[0]);else{s.links++;g.timers={};g.contacts={};g.effect={};g.hold=0;changed(g);}}}
+    if(id==='sun'){const left=sunRay(e,0),right=sunRay(p,1);g.effect={left:left.lit,right:right.lit,rays:[left.line,right.line].filter(Boolean)};if(pair(left.lit&&right.lit,.4))complete(g,point(600,350));}
+    if(id==='world'){const from=s.links,to=(from+1)%4,past=held('world-past',e,worldVertices[from]),now=held('world-now',p,worldVertices[to]);g.effect={past,now,from,to};if(pair(past&&now)){if(from===3)complete(g,worldVertices[0]);else{s.links++;g.timers={};g.contacts={};g.effect={};g.hold=0;changed(g);}}}
     g.view=view(g);g.open=g.ready=g.view.clickable&&!g.won;
   }
   function view(g){
