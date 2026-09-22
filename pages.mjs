@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const root=path.dirname(fileURLToPath(import.meta.url));
 const repo='/repos/kanade6929/two-seconds-after-you';
 const url='https://kanade6929.github.io/two-seconds-after-you/';
-const runtime=['index.html','style.css','rules.js','core.js','symbols.js','render.js','community-config.js','community.js','app.js','assets/FZfont140.TTF'];
+const runtime=['index.html','style.css','rules.js','core.js','symbols.js','render.js','community-config.js','community.js','music.js','app.js','assets/FZfont140.TTF','assets/night-tide.mp3'];
 async function main(){
   if(process.argv.includes('--verify')){
     for(const file of runtime){
@@ -16,7 +16,7 @@ async function main(){
       // Checkout on GitHub normalizes source to LF; compare normalized text.
       const normalize=s=>typeof s==='string'?s.replace(/\r\n/g,'\n'):s;
       const digest=s=>crypto.createHash('sha256').update(normalize(s)).digest('hex');
-      const binary=/\.(woff2|ttf)$/i.test(file);
+      const binary=/\.(woff2|ttf|mp3)$/i.test(file);
       if(digest(binary?Buffer.from(await response.arrayBuffer()):await response.text())!==digest(fs.readFileSync(path.join(root,file),binary?undefined:'utf8')))throw Error(file+': online content differs');
       console.log(file+': verified');
     }

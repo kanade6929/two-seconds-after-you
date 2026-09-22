@@ -8,7 +8,7 @@
   let mode='title',game=null,raw={x:600,y:540,down:false},seen=false,inside=true,down=false,pressed=null,hovered=null,dispatching=false,mouseGestureIsLight=false;
   const follower=new Follower(raw),cursor=$('virtualCursor');
   let last=performance.now(),accumulator=0,titleTime=0,titleTimeline=new Timeline(),celebration=0,resumeAge=0,resumePlaced=false,returnMode='title',hintTier=0;
-  let audio=null,audioBus=null,audioVerb=null,lastRevision=0,paintElapsed=0,lastPaint=0,paintMode='';const voices=new Set(),transitions=new Map();
+  let audio=null,audioBus=null,audioVerb=null,music=null,lastRevision=0,paintElapsed=0,lastPaint=0,paintMode='';const voices=new Set(),transitions=new Map();
   let touchMode=window.matchMedia('(pointer: coarse)').matches,touchDrag=null;const touchGesture=new TouchGesture();document.body.classList.toggle('touch-mode',touchMode);
   function touchFeedback(){const state=touchGesture.id===null?'idle':touchGesture.dragging?'moving':touchGesture.held?'holding':'pending';if($('touchPad').dataset.gesture!==state)$('touchPad').dataset.gesture=state;}
   function resetTouch(){touchDrag=null;touchGesture.cancel();down=false;touchFeedback();}
@@ -30,8 +30,9 @@
     audioVerb=audio.createConvolver();const length=Math.floor(audio.sampleRate*2.8),impulse=audio.createBuffer(2,length,audio.sampleRate);
     let seed=73;for(let ch=0;ch<2;ch++){const data=impulse.getChannelData(ch);for(let i=0;i<length;i++){seed=(seed*16807)%2147483647;data[i]=(seed/1073741823.5-1)*Math.exp(-i/length*7)*.24;}}
     audioVerb.buffer=impulse;const wet=audio.createGain();wet.gain.value=.24;audioVerb.connect(wet);wet.connect(audioBus);
-  }}if(audioBus)audioBus.gain.setTargetAtTime(1,audio.currentTime,.06);audio?.resume().catch(()=>{});}catch{}}
-  function silence(){if(!audio)return;audioBus?.gain.setTargetAtTime(0,audio.currentTime,.035);for(const voice of voices){try{voice.stop(audio.currentTime+.06);}catch{}}}
+    if(window.NightMusic)music=new NightMusic(audio,audioBus);
+  }}if(audioBus)audioBus.gain.setTargetAtTime(1,audio.currentTime,.06);audio?.resume().then(()=>{if(!muted&&!document.hidden){music?.setScene(mode);music?.start();}}).catch(()=>{});}catch{}}
+  function silence(){music?.stop();if(!audio)return;audioBus?.gain.setTargetAtTime(0,audio.currentTime,.035);for(const voice of voices){try{voice.stop(audio.currentTime+.06);}catch{}}}
   function tone(f=440,d=.9,volume=.025,delay=0){
     if(muted||document.hidden||audio?.state!=='running'||voices.size>=48)return;
     try{const start=audio.currentTime+delay,duration=Math.max(.8,d*1.6);
@@ -54,7 +55,7 @@
   function lightCursor(){return ['play','resuming','celebrate'].includes(mode);}
   function show(next){
     if(mode!==next&&['paused','menu','community','resuming'].includes(next))tone(next==='resuming'?523.25:392,.9,.013);
-    mode=next;resetTouch();pressed?.classList.remove('virtual-down');pressed=null;
+    mode=next;music?.setScene(mode);resetTouch();pressed?.classList.remove('virtual-down');pressed=null;
     hovered?.classList.remove('virtual-hover');hovered=null;document.body.classList.toggle('light-cursor',lightCursor());
     const mapping={titleScreen:'title',pauseScreen:'paused',completeScreen:'complete',endingScreen:'ending',levelMenu:'menu',community:'community'};
     for(const[id,m]of Object.entries(mapping))visible(id,mode===m);
@@ -155,7 +156,7 @@
   document.addEventListener('wheel',e=>{if(touchMode||!lightCursor())return;let el=atCursor();while(el&&el!==document.body){if(el.scrollHeight>el.clientHeight&&/auto|scroll/.test(getComputedStyle(el).overflowY)){e.preventDefault();el.scrollBy(0,e.deltaY);return;}el=el.parentElement;}},{passive:false});
   document.documentElement.addEventListener('pointerleave',e=>{if(e.pointerType==='touch')return;inside=false;pause();});window.addEventListener('blur',pause);
   document.addEventListener('visibilitychange',()=>{if(document.hidden){pause();silence();accumulator=0;}last=performance.now();});window.addEventListener('resize',()=>{renderer.resize();pause();});
-  window.addEventListener('pagehide',checkpoint);
+  window.addEventListener('pagehide',()=>{checkpoint();silence();});
   window.addEventListener('keydown',e=>{if(e.isComposing)return;if(e.key==='Escape'){if(mode==='menu')closeMenu();else if(mode==='community')home();else if(!$('hint').hidden)visible('hint',false);else pause();}});
   $('start').onclick=()=>enter(0);$('continueGame').onclick=()=>{if(progress.started)enter(progress.current,progress.checkpoints[progress.current]||{});};$('pauseRetry').onclick=retry;$('pause').onclick=pause;$('resume').onclick=resume;
   $('undo').onclick=()=>{if(mode==='play'&&game.undo()){resetTouch();afterUpdate(false);}};$('release').onclick=()=>{if(mode==='play'&&game.release()){resetTouch();afterUpdate(false);}};

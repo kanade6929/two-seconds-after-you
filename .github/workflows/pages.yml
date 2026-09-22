@@ -30,7 +30,7 @@ jobs:
       - name: Prepare runtime files only
         run: |
           mkdir -p _site
-          cp index.html style.css rules.js core.js symbols.js render.js community-config.js community.js app.js _site/
+          cp index.html style.css rules.js core.js symbols.js render.js community-config.js community.js music.js app.js _site/
           cp -r assets _site/
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
