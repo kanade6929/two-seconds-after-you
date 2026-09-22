@@ -28,7 +28,7 @@
       const s=await this.identity();return this.request('/rest/v1/comments',{method:'POST',token:s.access_token,headers:{Prefer:'return=representation'},body:{user_id:s.user.id,nickname,body}});
     }
     async readLikes(){const s=await this.identity();const r=await this.request('/rest/v1/rpc/community_likes',{method:'POST',token:s.access_token,body:{}});return r;}
-    async toggleLike(){if(this.likePending)return this.likePending;this.likePending=(async()=>{const s=await this.identity(),info=await this.readLikes();if(info.liked)await this.request('/rest/v1/likes?user_id=eq.'+encodeURIComponent(s.user.id),{method:'DELETE',token:s.access_token});else await this.request('/rest/v1/likes',{method:'POST',token:s.access_token,headers:{Prefer:'return=representation'},body:{user_id:s.user.id}});return this.readLikes();})();try{return await this.likePending;}finally{this.likePending=null;}}
+    async toggleLike(knownLiked){if(this.likePending)return this.likePending;this.likePending=(async()=>{const s=await this.identity(),liked=typeof knownLiked==='boolean'?knownLiked:(await this.readLikes()).liked;if(liked)await this.request('/rest/v1/likes?user_id=eq.'+encodeURIComponent(s.user.id),{method:'DELETE',token:s.access_token});else await this.request('/rest/v1/likes',{method:'POST',token:s.access_token,headers:{Prefer:'return=representation'},body:{user_id:s.user.id}});return this.readLikes();})();try{return await this.likePending;}finally{this.likePending=null;}}
   }
   if(typeof module!=='undefined'&&module.exports)module.exports=Community;else root.EchoCommunity=Community;
 })(typeof globalThis!=='undefined'?globalThis:this);

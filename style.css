@@ -49,6 +49,12 @@ p{line-height:1.9;color:var(--muted)}
 .micro{font-size:11px;letter-spacing:.13em;margin-top:17px}
 .community-actions{display:flex;gap:10px;margin-top:25px}
 .community-actions button{font-size:12px;background:#0d1a28}
+#likeButton{transition:background-color .18s,color .18s,border-color .18s,box-shadow .18s,transform .1s var(--ease)}
+#likeButton svg path{transition:fill .14s ease-out,stroke .14s ease-out,opacity .14s ease-out}
+#likeButton[aria-pressed="true"]{color:var(--gold);border-color:#9d7656;background:#241d1c;box-shadow:0 3px 22px #070c1466,0 0 18px #edbd8818}
+#likeButton[aria-pressed="true"] svg path{fill:currentColor;stroke:currentColor}
+#likeButton:active,#likeButton.virtual-down{transform:translateY(1px) scale(.98);transition-duration:.07s}
+#likeButton.is-committing{cursor:progress}
 .title-note{position:absolute;right:11%;bottom:12%;font-size:12px;letter-spacing:.1em}
 .game-heading{position:fixed;z-index:2;top:105px;left:7%;right:7%;display:flex;gap:24px;pointer-events:none}
 .level-number{font-family:var(--font);font-size:40px;min-width:64px;color:var(--gold);border-top:1px solid var(--line);padding-top:12px}
@@ -101,6 +107,8 @@ input::placeholder,textarea::placeholder{color:#9baec0}
 input:disabled,textarea:disabled{opacity:.55}
 form button{justify-self:start;margin:7px 0 16px}
 .comment-list{margin-top:16px}
+.comment-list:not(:empty){max-height:min(42dvh,420px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:12px;border-bottom:1px solid var(--line);touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.comment-list:focus-visible{outline:1px solid var(--gold);outline-offset:5px}
 .comment{padding:20px 0;border-top:1px solid var(--line)}
 .comment strong{font-weight:400;color:var(--gold)}
 .comment time{font-size:11px;color:var(--muted);margin-left:16px}
@@ -184,6 +192,7 @@ form button{justify-self:start;margin:7px 0 16px}
 .touch-mode .community-screen{padding:calc(82px + env(safe-area-inset-top)) 16px 50px}
 .touch-mode .community-panel{width:100%}
 .touch-mode input,.touch-mode textarea{font-size:16px}
+.touch-mode .comment-list:not(:empty){max-height:min(38dvh,360px);padding-right:8px}
 @media(orientation:landscape) and (max-height:600px){
 .touch-mode .title-copy{top:88px;width:70%;padding-bottom:80px}
 .touch-mode .title-copy h1{font-size:44px}.touch-mode .title-copy h1 br{display:none}.touch-mode .title-copy h1 span{padding-left:0}
@@ -194,6 +203,7 @@ form button{justify-self:start;margin:7px 0 16px}
 .touch-mode .touch-controls{left:248px;right:14px;bottom:12px;height:98px}.touch-mode .touch-pad{gap:5px;font-size:13px}.touch-mode .touch-pad svg{width:19px;height:19px}
 .touch-mode.touch-playing footer{display:none}.touch-mode .hint-panel{left:245px;right:15px;bottom:120px;max-height:calc(100vh - 190px)}
 .touch-mode .centered{padding:75px 25px 25px;align-items:flex-start}.touch-mode .ritual-panel{max-width:600px;padding:20px}.touch-mode .ritual-panel p{margin:12px 0}.touch-mode .panel-sigil{display:none}.touch-mode .stack{display:flex;max-width:none;justify-content:center}.touch-mode .chapter-grid{grid-template-columns:repeat(4,1fr)}
+.touch-mode .comment-list:not(:empty){max-height:210px}
 }
 
 @media(max-height:760px){.title-copy{top:105px}
