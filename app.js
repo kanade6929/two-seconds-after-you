@@ -181,7 +181,7 @@
   $('commentForm').addEventListener('submit',async e=>{e.preventDefault();if(communityBusy||!community.configured)return;const nickname=$('nickname').value.trim(),body=$('commentBody').value.trim();if(!body||[...nickname].length>16||[...body].length>300){communityState('请留下 1—300 字的留言，称呼不超过 16 字。');return;}communityBusy=true;$('submitComment').disabled=true;communityState('正在送出微光……');let sent=false;try{await community.submitComment(nickname,body);$('commentBody').value='';sent=true;tone(523.25);}catch{communityState('未能送出。内容已保留，请重试。');}finally{communityBusy=false;$('submitComment').disabled=false;}if(sent){await readComments();communityState('微光已送达，公开可见。');}});
   function likeView(info){$('likeLabel').textContent=`${info.liked?'已赞':'点赞'} · ${info.count}`;$('likeButton').setAttribute('aria-pressed',String(info.liked));}
   let liking=false;$('likeButton').onclick=async()=>{if(!community.configured){$('commentsButton').click();return;}if(liking)return;liking=true;$('likeButton').disabled=true;try{likeView(await community.toggleLike());}catch{$('likeLabel').textContent='点赞未送达 · 重试';}finally{liking=false;$('likeButton').disabled=false;}};
-  if(community.configured)community.readLikes().then(likeView).catch(()=>{$('likeLabel').textContent='点赞暂不可用 · 重试';});
+  if(community.configured){$('likeLabel').textContent='点赞 · 正在读取';$('likeButton').disabled=true;community.readLikes().then(likeView).catch(()=>{$('likeLabel').textContent='点赞暂不可用 · 重试';}).finally(()=>{$('likeButton').disabled=false;});}
   controls();show('title');requestAnimationFrame(frame);
   document.fonts?.ready.then(()=>{renderer.layoutKey='';});
 })();
