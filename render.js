@@ -234,17 +234,12 @@
       const approach=(a,b,duration)=>a+(b-a)*(1-Math.exp(-dt/(duration/3)));
       if(v.axis){this.path([{x:590,y:215},{x:610,y:215},{x:610,y:510},{x:590,y:510},{x:590,y:215}],C.muted,1.2);for(let y=235;y<500;y+=34)this.path([{x:593,y:y+10},{x:607,y}],C.line);}
       for(const line of v.lines)this.path(line,C.line);
-      if(v.world){
-        const points=[...R.worldVertices,R.worldVertices[0]];this.path(points,C.line,1.2);
-        for(let i=0;i<4;i++)if(v.world.joined[i]&&v.world.joined[(i+1)%4])this.path([R.worldVertices[i],R.worldVertices[(i+1)%4]],C.ink,2);
-        this.sigil('世界',600,365,C.red,.25,1.35);
-        this.text(v.world.joined.filter(Boolean).length+' / 4 已接合',600,409,C.muted,11);
+      // Moving light chords are drawn directly: caching per-position beams
+      // would retain hundreds of fading paths and reintroduce mobile stutter.
+      for(const line of [v.chord,...(v.chords||[])].filter(Boolean)){
+        c.save();c.globalAlpha=.16;this.path(line,C.ink,6);c.globalAlpha=.85;this.path(line,C.ink,1.4);c.restore();
       }
-      if(v.balance){const [left,right]=v.balance.torque,target=Math.max(-1,Math.min(1,(right-left)/6));this.balanceTilt=(this.balanceTilt||0)+(target-(this.balanceTilt||0))*(1-Math.exp(-dt*10));const tilt=this.balanceTilt*25;
-        this.path([{x:318,y:445-tilt},{x:882,y:445+tilt}],C.red,2);this.path([{x:583,y:478},{x:600,y:446},{x:617,y:478},{x:583,y:478}],C.muted,1.5);
-        this.text('今 · 重 '+v.balance.masses[0],480,260,C.ink,14);this.text('昔 · 重 '+v.balance.masses[1],720,260,C.red,14);
-        this.text('左力 '+left,450,495,C.muted,12);this.text('右力 '+right,750,495,C.muted,12);
-      }
+      for(const wall of v.rayWalls||[])this.path(wall,C.muted,3);
       const liveBeams=new Set();for(const line of v.beams||[]){const key=line.map(p=>p.x+','+p.y).join(':');liveBeams.add(key);if(!this.beamLights.has(key))this.beamLights.set(key,{line,light:0});}
       for(const [key,beam]of this.beamLights){
         const active=liveBeams.has(key);beam.light=approach(beam.light,active?1:0,active?.14:.18);if(!active&&beam.light<.002){this.beamLights.delete(key);continue;}
@@ -274,17 +269,32 @@
         this.polygon(n.x,n.y,n.releaseRadius,this.mix(C.line,col,.25+light*.4),false,8,Math.PI/8);
         if(n.rune){this.path([{x:n.x-21,y:n.y+20},{x:n.x+21,y:n.y+20}],col,2);n.rune.forEach((height,j)=>this.path([{x:n.x+(j-1)*18,y:n.y+20},{x:n.x+(j-1)*18,y:n.y+14-height*11}],col,2));}
         else if(n.glyph)this.rune(n.glyph,n.x,n.y,col);
-        else if(n.water!==undefined){this.path([{x:n.x-22,y:n.y-25},{x:n.x-22,y:n.y+25},{x:n.x+22,y:n.y+25},{x:n.x+22,y:n.y-25}],col,2);for(let j=1;j<=n.capacity;j++)this.path([{x:n.x-18,y:n.y+25-j*5},{x:n.x+18,y:n.y+25-j*5}],j<=n.water?C.ink:C.line,j<=n.water?3:1);this.text(String(n.water),n.x,n.y-42,C.ink,19);}
+        else if(n.stone!==undefined){
+          if(n.stone){c.save();if(n.stored)c.globalAlpha*=.3;this.polygon(n.x,n.y,14+n.stone*2,col,false,4);this.text(String(n.stone),n.x,n.y+6,col,19);c.restore();}
+          else{this.path([{x:n.x-9,y:n.y+3},{x:n.x,y:n.y+9},{x:n.x+9,y:n.y+3}],col,1.4);}
+          if(n.slot&&v.balance.selected>=0){c.save();c.globalAlpha=.45;this.polygon(n.x,n.y,48,C.ink,false,8,Math.PI/8);c.restore();}
+        }
         else if(n.mirror!==undefined){const ends=n.mirror===0?[[-18,0],[18,0]]:n.mirror===1?[[-15,15],[15,-15]]:[[-15,-15],[15,15]];this.path(ends.map(([x,y])=>({x:n.x+x,y:n.y+y})),col,2);}
         else if(n.turn!==undefined){const i=v.nodes.indexOf(n),oldTurn=this.worldAngles.get(i)??n.turn,delta=((n.turn-oldTurn+6)%4)-2,turn=reduced?n.turn:oldTurn+delta*(1-Math.exp(-dt*22));this.worldAngles.set(i,turn);const ports=R.worldPorts(i,turn);this.path([ports[0],n,ports[1]],v.world.joined[i]?C.ink:col,2.2);this.polygon(n.x,n.y,4,col);}
+        else if(n.id==='vessel'&&v.water){
+          const w=v.water,base=n.y+28,top=n.y-28,y=base-56*w.value/120,pred=base-56*w.forecast/120;
+          this.path([{x:n.x-23,y:top},{x:n.x-23,y:base},{x:n.x+23,y:base},{x:n.x+23,y:top}],col,1.5);
+          c.save();c.globalAlpha=.32;c.fillStyle=C.ink;c.fillRect(n.x-21,y,42,base-y);c.restore();
+          for(const v of w.target)this.path([{x:n.x-30,y:base-56*v/120},{x:n.x+30,y:base-56*v/120}],C.red,1);
+          this.path([{x:n.x-23,y:pred},{x:n.x+23,y:pred}],C.ink,2,[4,3]);
+          this.text(Math.round(w.value/1.2)+'%  /  预测 '+Math.round(w.forecast/1.2)+'%',n.x,n.y-64,C.ink,13);
+        }
         else this.sigil(n.sigil,n.x,n.y,col,light,.72);
         this.orbitParticles(n,light,t,reduced,hue);
         const labelColor=this.mix(C.muted,hue,light);
-        this.text(n.label,n.x,n.y+59,labelColor,12);
+        if(this.mobile&&game.index===1&&(n.id==='source'||n.id==='receiver'))this.text(n.label,n.x+(n.id==='source'?-53:53),n.y+4,labelColor,12,n.id==='source'?'right':'left');
+        else if(this.mobile&&game.index===1&&n.id.startsWith('mirror'))this.text('折印',n.x,n.y+59,labelColor,12);
+        else if(game.index===4)this.text(n.label,n.x+(n.x<600?-57:57),n.y+4,labelColor,12,n.x<600?'right':'left');
+        else this.text(n.label,n.x,n.y+59,labelColor,12);
         const amount=n.amount??(active?v.progress:0);
         if(amount>0){this.path([{x:n.x-20,y:n.y+45},{x:n.x+20,y:n.y+45}],C.line,2);this.path([{x:n.x-20,y:n.y+45},{x:n.x-20+40*Math.min(1,amount),y:n.y+45}],hue,2);}
       }
-      if(v.clickable&&v.actionPoint&&mode==='play'&&!v.mirror){const node=v.nodes.find(n=>n.x===v.actionPoint.x&&n.y===v.actionPoint.y),labelOffset=node?.water!==undefined?42+Math.max(24,this.mobile?16/this.scale:24):65;this.clickCue(v.actionPoint,v.actionLabel,t,reduced,false,labelOffset);}
+      if(v.clickable&&v.actionPoint&&mode==='play'&&!v.mirror)this.clickCue(v.actionPoint,v.balance?'':v.actionLabel,t,reduced);
       const progress=v.progress;
       c.save();c.globalAlpha=mode==='celebrate'?.4:1;this.cursors(null,game.echo,game.timeline,reduced,game.t,!!game.memory);c.restore();
       // Reflections sit above seals, just like the real pointer, so a correct

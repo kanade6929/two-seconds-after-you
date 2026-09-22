@@ -1,0 +1,2 @@
+const {open}=require('./browser-driver.cjs'),R=require('../rules.js');
+(async()=>{for(const channel of ['chrome','msedge','chrome-mobile','chrome-mobile-landscape']){const d=await open(channel,true);try{await d.chapter(1);const m=R.magicLayout();await d.tap(m.mirrors[0]);await d.tap(m.mirrors[1]);await d.move(m.source,3.2);await d.move(m.receiver,1.4);await d.shot('realtime-magic');await d.close();}catch(e){await d.browser.close();throw e;}}})().catch(e=>{console.error(e);process.exitCode=1;});

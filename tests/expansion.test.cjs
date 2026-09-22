@@ -1,56 +1,14 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),{Game,Rules:R,LEVELS}=require('../core.js'),{driver,solve}=require('./routes.cjs');
-for(let i=0;i<8;i++)test('deliberate input with long pauses solves '+LEVELS[i].title,()=>{const g=solve(driver(i),i);assert.equal(g.won,true);assert.equal(g.level.phases,1);});
-test('memory is explicit, arrives in two game seconds, persists, and releases immediately',()=>{
- const d=driver(0),g=d.g;d.move(g.level.seal,5);d.move(g.level.exit,5);d.click();assert.equal(g.won,false);assert.equal(g.memory,null);
- d.tap(g.level.seal);assert.equal(g.memory,null);d.move(g.level.seal,1.9);assert.equal(g.memory,null);d.move(g.level.seal,.1);assert.equal(g.memory.id,'lamp');
- d.move(g.level.exit,60);assert.equal(g.open,true);g.release();assert.equal(g.memory,null);d.click();assert.equal(g.won,false);d.pin(g.level.seal);d.tap(g.level.exit);assert.equal(g.won,true);
-});
-test('moving and holding alone never solves any puzzle',()=>{for(let i=0;i<8;i++){const d=driver(i);for(const n of d.g.view.nodes)d.move(n,3,true);assert.equal(d.g.won,false);assert.equal(d.g.memory,null);}});
-test('pending memory cannot be borrowed by clicking a destination early',()=>{for(const i of [3,4,7]){const d=driver(i),a=R.anchors(i);d.tap(a[0]);const pending=d.g.pending.id;d.g.update(0,a[1],true);assert.equal(d.g.memory,null);assert.equal(d.g.pending.id,pending);assert.equal(d.g.won,false);}});
-test('magician has exactly one complete two-reflection light path',()=>{const solutions=[];for(let a=0;a<3;a++)for(let b=0;b<3;b++)if(R.traceMagic(0,[a,b]).hit)solutions.push([a,b]);assert.deepEqual(solutions,[[1,1]]);});
-test('lovers requires two cross-side reflections, not bodies or a same-side shortcut',()=>{
- const [past,now]=R.loversSeals,d=driver(2),g=d.g;
- d.pin(past);d.move(now,20);assert.equal(g.won,false);assert.equal(g.view.nodes.some(n=>n.active),false);
- d.release();d.pin(R.mirrorPoint(now));d.move(R.mirrorPoint(past),20);assert.equal(g.won,false,'swapping the past and present roles fails');
- d.release();d.pin(R.mirrorPoint(past));d.move(now,20);assert.equal(g.won,false);assert.equal(g.view.nodes[0].active,true);assert.equal(g.view.nodes[1].active,false);
- d.move(R.mirrorPoint(now),20);assert.equal(g.won,true);
-});
-test('lovers exposes four correctly reflected points, retargets pending memory, and saves coordinates',()=>{
- const d=driver(2),g=d.g;d.tap({x:720,y:320});d.tap({x:780,y:280});assert.equal(g.pending.x,g.point.x);d.move(g.point,2.1);
- const checkpoint=g.checkpoint(),fresh=new Game(2,checkpoint);assert.equal(fresh.pending.id,'reflection');assert.equal(fresh.pending.x,checkpoint.anchorPoint.x);assert.equal(fresh.memory,null);
- d.move({x:440,y:350},20);assert.deepEqual(g.view.mirror.now,R.mirrorPoint(g.point));assert.deepEqual(g.view.mirror.past,R.mirrorPoint(g.echo));assert.equal(g.view.mirror.pinned,true);
- assert.ok(new Set([g.point,g.echo,g.view.mirror.now,g.view.mirror.past].map(p=>[Math.round(p.x),Math.round(p.y)].join())).size===4);
- d.release();d.undo();assert.equal(g.echo.x,g.memory.x);assert.deepEqual(g.view.mirror.past,R.mirrorPoint(g.memory));
- assert.equal(new Game(2,{anchor:'reflection',anchorPoint:{x:Infinity,y:200}}).pending,null);
-});
-test('temperance conserves eight units on every reachable pour; goal needs seven logical pours',()=>{
- const queue=[[[8,0,0],0]],seen=new Set();let shortest=null;
- for(let h=0;h<queue.length;h++){const [w,depth]=queue[h];if(seen.has(w.join()))continue;seen.add(w.join());if(w[0]===4&&w[1]===4&&shortest===null)shortest=depth;
- for(let a=0;a<3;a++)for(let b=0;b<3;b++){const n=R.pour(w,a,b);if(n){assert.equal(n.reduce((a,b)=>a+b),8);assert.ok(n.every((v,i)=>v>=0&&v<=R.capacities[i]));queue.push([n,depth+1]);}}}
- assert.equal(shortest,7);const d=driver(3);d.pin(R.cups[0]);d.tap(R.cups[1]);assert.deepEqual(d.g.state.water,[3,5,0]);d.undo();assert.deepEqual(d.g.state.water,[8,0,0]);assert.equal(d.g.memory.id,'cup0');
-});
-test('star requires an Euler trail: arbitrary order, repeat and nonexistent edges fail',()=>{
- assert.deepEqual(R.starVertices.map((_,i)=>R.starEdges.filter(e=>e.includes(i)).length),[3,4,2,4,3]);
- const d=driver(4);d.pin(R.starVertices[0]);d.tap(R.starVertices[2]);assert.deepEqual(d.g.state.path,[0]);d.tap(R.starVertices[1]);d.tap(R.starVertices[0]);assert.deepEqual(d.g.state.path,[0,1]);d.undo();assert.deepEqual(d.g.state.path,[0]);assert.equal(solve(d,4).won,true);
-});
-test('moon hides target while pinned, all options have identical cues, release restores target',()=>{
- const d=driver(5),g=d.g;assert.deepEqual(g.view.moonMemory.target,R.moonTarget);d.pin(R.moonWell);assert.equal(g.view.moonMemory.target,null);
- d.move(R.moonOptions[0],20);assert.equal(g.view.actionLabel,'确认倒影');d.click();assert.equal(g.won,false);d.move(R.moonOptions[1]);assert.equal(g.view.actionLabel,'确认倒影');g.release();assert.deepEqual(g.view.moonMemory.target,R.moonTarget);d.click();assert.equal(g.won,false);
- assert.deepEqual(R.moonRunes[1],R.moonTarget.map(line=>line.map(([x,y])=>[x,-y])));
-});
-test('sun parity has one solution, all-on is not a solution, unpowered light keys do not win',()=>{
- assert.deepEqual(Array.from({length:8},(_,i)=>i).filter(i=>R.sunBits(i)===15),[3]);assert.notEqual(R.sunBits(7),15);
- const d=driver(6);d.tap(R.sunKeys[0]);d.tap(R.sunKeys[1]);assert.equal(d.g.won,false);d.pin(R.sunSource);assert.equal(d.g.won,true);
-});
-test('world rotation invariant, arbitrary-pause solution, undo and save are valid',()=>{
- const d=driver(7);d.pin(R.worldVertices[0]);d.move(R.worldVertices[1],20);d.click();assert.deepEqual(d.g.state.turns,[1,0,0,1]);d.undo();assert.deepEqual(d.g.state.turns,R.worldInitial);
- d.tap(R.worldVertices[1]);const saved=d.g.checkpoint(),fresh=driver(7,saved);assert.deepEqual(fresh.g.state.turns,saved.turns);assert.equal(fresh.g.memory,null);assert.ok(fresh.g.pending);assert.equal(solve(fresh,7).won,true);
-});
-test('checkpoint validates water, path, orientations, anchor and reachable ring parity',()=>{
- const g=new Game(3,{water:[99,0,0],orientations:[9,9],path:[0,0],anchor:'admin',turns:[0,0,0,0]});assert.deepEqual(g.state.water,[8,0,0]);assert.deepEqual(g.state.path,[]);assert.deepEqual(g.state.orientations,[0,0]);assert.equal(g.pending,null);assert.deepEqual(g.state.turns,R.worldInitial);
-});
-test('undo restores pending delay relative to now, without ageing while paused',()=>{
- const d=driver(0);d.tap(d.g.level.seal);d.move(d.g.point,.5);const remain=d.g.pending.at-d.g.t;d.release();d.move(d.g.point,10);d.undo();assert.ok(Math.abs(d.g.pending.at-d.g.t-remain)<1e-7);assert.equal(d.g.memory,null);
-});
-test('spatial acquisition still matches the drawn octagon',()=>{const g=new Game(),c={x:600,y:350};for(let i=0;i<8;i++){const a=Math.PI/8+i*Math.PI/4;assert.equal(R.occupy(g,'a',{x:c.x+39.9*Math.cos(a),y:c.y+39.9*Math.sin(a)},c),true);}assert.equal(R.occupy(g,'a',{x:646,y:350},c),false);});
+const test=require('node:test'),assert=require('node:assert/strict'),{Game,Rules:R,LEVELS,STEP}=require('../core.js'),{driver,solve}=require('./routes.cjs');
+for(let i=0;i<8;i++)test('limited-speed real-time route solves '+LEVELS[i].title,()=>{assert.equal(solve(driver(i),i).won,true);});
+test('no click can pin an echo; walking away expires power',()=>{const d=driver(0);d.pin(d.g.level.seal);assert.equal(d.g.memory,null);d.move(d.g.level.exit,1.3);assert.equal(d.g.ready,true);d.move(d.g.level.exit,2.2);assert.equal(d.g.ready,false);d.click();assert.equal(d.g.won,false);});
+test('eight chapters cannot be solved by idling, rapid sweeps or repeated clicks',()=>{for(let i=0;i<8;i++){const d=driver(i);d.move(d.g.point,10);for(let j=0;j<30;j++){d.move(d.g.view.nodes[j%d.g.view.nodes.length],.08);d.click();}assert.equal(d.g.won,false,LEVELS[i].title);}});
+test('magic has only one valid two-reflection path and preserves its setup',()=>{const sols=[];for(let a=0;a<3;a++)for(let b=0;b<3;b++)if(R.traceMagic(0,[a,b]).hit)sols.push([a,b]);assert.deepEqual(sols,[[1,1]]);const d=driver(1);d.tap(R.magicLayout().mirrors[0]);const fresh=new Game(1,d.g.checkpoint());assert.deepEqual(fresh.state.orientations,[1,0]);assert.equal(fresh.echo,null);});
+test('lovers accepts mirrors only, with correct temporal identities',()=>{for(const [a,b]of [[...R.loversSeals],[R.mirrorPoint(R.loversSeals[1]),R.mirrorPoint(R.loversSeals[0])]]){const d=driver(2);d.move(a,3.2);d.move(b,1.9);assert.equal(d.g.won,false);}const d=driver(2);d.move(R.mirrorPoint(R.loversSeals[0]),3.2);d.move({x:480,y:390},1);assert.deepEqual(d.g.view.mirror.past,R.mirrorPoint(d.g.echo));assert.deepEqual(d.g.view.mirror.now,R.mirrorPoint(d.g.point));assert.equal(new Set([d.g.point,d.g.echo,d.g.view.mirror.now,d.g.view.mirror.past].map(p=>[Math.round(p.x),Math.round(p.y)].join())).size,4);});
+test('star has one exact endpoint solution; sequential single-star touches do not count',()=>{const pairs=[];for(let l=0;l<3;l++)for(let r=0;r<3;r++)if(R.targetStars.every(p=>R.segmentDistance(p,R.starLeft[l],R.starRight[r])<=13))pairs.push([l,r]);assert.deepEqual(pairs,[[2,0]]);const d=driver(4);for(const p of R.targetStars)d.move(p,3);assert.equal(d.g.won,false);d.move(R.starLeft[0],3);d.move(R.starRight[0],1.8);assert.equal(d.g.won,false);});
+test('moon answer is hidden only while live well power exists; wrong choice can recover',()=>{const d=driver(5);d.move(R.moonWell,3.2);assert.equal(d.g.view.moonMemory.target,null);d.move(R.moonOptions[0],1.1);assert.equal(d.g.view.actionLabel,'确认倒影');d.click();assert.equal(d.g.won,false);d.move(R.moonOptions[0],3);assert.deepEqual(d.g.view.moonMemory.target,R.moonTarget);assert.equal(d.g.view.clickable,false);assert.equal(solve(d,5).won,true);});
+test('sun rays use real obstacles and require two separate role-specific lights',()=>{assert.equal(R.sunRay(R.sunPads[0],0).lit,false);assert.equal(R.sunRay(R.sunPads[1],0).lit,true);assert.equal(R.sunRay(R.sunPads[2],1).lit,true);assert.equal(R.sunRay(R.sunPads[3],1).lit,false);const d=driver(6);d.move(R.sunPads[1],3);d.move(R.sunPads[3],1.8);assert.equal(d.g.won,false);d.move(R.sunPads[2],5);assert.equal(d.g.won,false);});
+test('world accepts ordered handoffs, not skipped, reversed or overlapping points; saves edges only',()=>{const d=driver(7);d.move(R.worldVertices[0],3.2);d.move(R.worldVertices[2],2);assert.equal(d.g.state.links,0);d.move(R.worldVertices[0],3.2);d.until(()=>d.g.state.links===1,R.worldVertices[1],2.1);const fresh=driver(7,d.g.checkpoint());assert.equal(fresh.g.state.links,1);assert.equal(fresh.g.echo,null);assert.equal(solve(fresh,7).won,true);});
+test('holding within an acquired octagon does not flicker and outside release edge fails immediately',()=>{const g=new Game(),c={x:600,y:350};assert.equal(R.occupy(g,'a',{x:630,y:350},c),true);assert.equal(R.occupy(g,'a',{x:640,y:350},c),true);assert.equal(R.occupy(g,'a',{x:650,y:350},c),false);assert.equal(R.occupy(g,'a',{x:640,y:350},c),false);});
+test('old static saves cannot inject memory, water or solved state into real-time journey',()=>{const g=new Game(3,{phase:0,anchor:'balance',water:60,placements:[-1,3,1,0]});assert.equal(g.memory,null);assert.equal(g.pending,null);assert.equal(g.state.water,0);assert.equal(g.won,false);const w=new Game(7,{rulesVersion:4,links:999});assert.equal(w.state.links,3);});
+test('30/60/144 FPS run identical fixed-step inputs for all eight chapters',()=>{for(let index=0;index<8;index++){const out=[];for(const fps of[30,60,144]){const d=driver(index),g=d.g;let accumulator=0;for(let frame=0;frame<fps*4;frame++){accumulator+=1/fps;while(accumulator+1e-9>=STEP){const t=g.t;g.update(STEP,d.f.update(STEP,{x:600+Math.sin(t)*180,y:400+Math.cos(t)*80}));accumulator-=STEP;}}out.push(JSON.stringify({point:g.point,echo:g.echo,state:g.state,hold:g.hold}));}assert.equal(out[0],out[1]);assert.equal(out[1],out[2]);}});

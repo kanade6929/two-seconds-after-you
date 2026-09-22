@@ -1,7 +1,7 @@
 // Observe renderer state only. Every gameplay action uses browser pointer input.
 const {chromium}=require(process.env.ECHO_PLAYWRIGHT_MODULE||'playwright');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const dir=path.join(__dirname,'../artifacts/browser'),key='two-seconds-after-you.arcana.v3';
+const dir=path.join(__dirname,'../artifacts/browser'),key='two-seconds-after-you.arcana.v4';
 async function open(channel='chrome',saved=false){
  const mobile=channel.includes('mobile'),landscape=channel.includes('landscape');
  const browser=await chromium.launch({channel:mobile?'chrome':channel,headless:true});

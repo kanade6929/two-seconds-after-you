@@ -1,9 +1,9 @@
 (function(){
   'use strict';
   const {Game,Timeline,Follower,TouchGesture,LEVELS,STEP,readProgress}=EchoCore,$=id=>document.getElementById(id);
-  const renderer=new EchoRenderer($('canvas')),saveKey='two-seconds-after-you.arcana.v3';
+  const renderer=new EchoRenderer($('canvas')),saveKey='two-seconds-after-you.arcana.v4';
   function read(key){try{return JSON.parse(localStorage.getItem(key))||{};}catch{return {};}}
-  const legacy=read('two-seconds-after-you.arcana.v2'),old=Object.keys(legacy).length?legacy:read('two-seconds-after-you.v1'),current=read(saveKey),saved=Object.keys(current).length?current:{...legacy,checkpoints:{}},progress=readProgress(saved);
+  const v3=read('two-seconds-after-you.arcana.v3'),legacy=Object.keys(v3).length?v3:read('two-seconds-after-you.arcana.v2'),old=Object.keys(legacy).length?legacy:read('two-seconds-after-you.v1'),current=read(saveKey),saved=Object.keys(current).length?current:{...legacy,checkpoints:{}},progress=readProgress(saved);
   let muted=(saved.muted??old.muted)===true,reduced=saved.reduced??old.reduced??window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let mode='title',game=null,raw={x:600,y:540,down:false},seen=false,inside=true,down=false,pressed=null,hovered=null,dispatching=false,mouseGestureIsLight=false;
   const follower=new Follower(raw),cursor=$('virtualCursor');
@@ -28,7 +28,7 @@
   function unlockAudio(){if(muted)return;try{if(!audio){const A=window.AudioContext||window.webkitAudioContext;if(A)audio=new A();}audio?.resume().catch(()=>{});}catch{}}
   function tone(f=440,d=.3,volume=.025){if(muted||audio?.state!=='running')return;try{const o=audio.createOscillator(),g=audio.createGain(),t=audio.currentTime;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(volume,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(audio.destination);o.start(t);o.stop(t+d+.03);}catch{}}
   function controls(){
-    $('inputNote').textContent=touchMode?'轻触与滑动 · 没有倒计时 · 不必急着抵达':'只需鼠标 · 没有倒计时 · 不必急着抵达';
+    $('inputNote').textContent=touchMode?'滑动与轻点 · 与两秒前的自己配合':'移动与点击 · 与两秒前的自己配合';
     $('soundLabel').textContent=muted?'声音 · 关':'声音 · 开';$('sound').setAttribute('aria-pressed',String(muted));
     $('motionLabel').textContent=reduced?'动态 · 减少':'动态 · 完整';$('motion').setAttribute('aria-pressed',String(reduced));document.body.classList.toggle('reduced',reduced);
     $('continueGame').disabled=!progress.started;$('continueLabel').textContent=progress.started?'继续 · '+LEVELS[progress.current].title:'继续旅程';
@@ -56,11 +56,11 @@
   function home(){checkpoint();titleTimeline=new Timeline();titleTime=0;show('title');controls();}
   function retry(){if(game)enter(game.index);}
   function updateStatus(){
-    const status=game.status(),phase='一张牌 · 一个谜题';
+    const status=game.status(),phase='昔光慢两秒 · 停留会被重播';
     if($('status').textContent!==status)$('status').textContent=status;
     if($('phaseLabel').textContent!==phase)$('phaseLabel').textContent=phase;
-    $('undo').disabled=game.history.length===0;$('release').disabled=!game.memory&&!game.pending;
-    const label=game.pending?'取消留影':'收回留影';if($('releaseLabel').textContent!==label)$('releaseLabel').textContent=label;
+    $('undo').disabled=game.history.length===0;$('release').disabled=false;
+    const label=game.index===3?'放空重来':'重建回声';if($('releaseLabel').textContent!==label)$('releaseLabel').textContent=label;
     visible('hintButton',game.t-game.progressAt>=25);
   }
   function win(){

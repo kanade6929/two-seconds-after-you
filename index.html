@@ -11,7 +11,7 @@
 </head>
 <body>
 <main id="app">
-  <canvas id="canvas" aria-label="青色是现在，暖金是过去。点击机关留下影子，两秒后抵达并一直守位。观察图形，点击解谜。"></canvas>
+  <canvas id="canvas" aria-label="青色是现在，暖金重播两秒前的动作。停留多久，影子就停留多久；安排移动与交接，让两个自己合作。"></canvas>
   <header class="topbar">
     <button id="home" class="wordmark" data-symbol="世界">辰星夜</button>
     <nav aria-label="设置"><button id="levelsButton" data-symbol="chapters">牌章</button><button id="sound" data-symbol="sound" aria-pressed="false"><span id="soundLabel">声音 · 开</span></button><button id="motion" data-symbol="星星" aria-pressed="false"><span id="motionLabel">动态 · 完整</span></button></nav>
@@ -25,13 +25,13 @@
       </div>
       <p class="intro">循着八张牌的微光，与两秒前的自己，<br>走过这一夜。</p>
       <div class="title-actions"><button id="start" class="primary" data-symbol="愚者">开始旅程</button><button id="continueGame" data-symbol="continue" disabled><span id="continueLabel">继续旅程</span></button><button id="titleLevels" data-symbol="chapters">选择牌章</button></div>
-      <p id="inputNote" class="micro">只需鼠标 · 没有倒计时 · 不必急着抵达</p>
+      <p id="inputNote" class="micro">移动与点击 · 与两秒前的自己配合</p>
       <div class="community-actions"><button id="commentsButton" data-symbol="message">留下微光</button><button id="likeButton" data-symbol="like" aria-pressed="false"><span id="likeLabel">点赞 · 暂未开放</span></button></div>
     </div>
     <p class="title-note">移动光点，让两秒前的你回应。</p>
   </section>
   <section id="gameHeading" class="game-heading" hidden><span id="levelNumber" class="level-number"></span><div><h1 id="levelTitle"></h1><p id="levelTheme"></p><p id="levelTask" class="task"></p></div><span id="phaseLabel" class="phase-label"></span></section>
-  <section id="gameBottom" class="game-bottom" hidden><p id="status" role="status"></p><div class="button-row"><button id="undo" data-symbol="back" disabled>撤回一步</button><button id="release" data-symbol="月亮" disabled><span id="releaseLabel">收回留影</span></button><button id="hintButton" data-symbol="星星" hidden>启示</button><button id="pause" data-symbol="pause">暂停</button></div></section>
+  <section id="gameBottom" class="game-bottom" hidden><p id="status" role="status"></p><div class="button-row"><button id="undo" data-symbol="back" disabled>撤回一步</button><button id="release" data-symbol="月亮"><span id="releaseLabel">重建回声</span></button><button id="hintButton" data-symbol="星星" hidden>启示</button><button id="pause" data-symbol="pause">暂停</button></div></section>
   <aside id="hint" class="hint-panel" hidden><h2>夜的启示</h2><p id="hintText"></p><div class="button-row"><button id="hintNext" data-symbol="continue">展示下一步</button><button id="closeHint" data-symbol="close">收起</button></div></aside>
   <section id="pauseScreen" class="screen centered scrim" hidden aria-labelledby="pauseTitle"><div class="ritual-panel"><div class="panel-sigil" data-symbol="月亮"></div><h2 id="pauseTitle">时间，停在这里。</h2><p>过去的你会等你回来。<br>继续后，光点会回到刚才的位置。</p><div class="stack"><button id="resume" class="primary" data-symbol="continue">继续旅程</button><button id="pauseRetry" data-symbol="retry">重置谜题</button><button id="pauseHome" data-symbol="back">返回首页</button></div></div></section>
   <section id="completeScreen" class="screen centered scrim" hidden aria-labelledby="completeTitle"><div class="ritual-panel"><div id="completeSigil" class="panel-sigil"></div><h2 id="completeTitle"></h2><p id="completeText"></p><button id="next" class="primary" data-symbol="continue"><span id="nextLabel">翻开下一张牌</span></button></div></section>

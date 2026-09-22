@@ -3,11 +3,13 @@
 const {chromium}=require(process.env.ECHO_PLAYWRIGHT_MODULE||'playwright');
 const fs=require('node:fs'),path=require('node:path');
 const root=path.join(__dirname,'..'),dir=path.join(root,'artifacts/browser');
+const chapter=process.argv[2]===undefined?4:Number(process.argv[2]),label='realtime-'+chapter;
+if(!Number.isInteger(chapter)||chapter<0||chapter>7)throw Error('chapter must be 0..7');
 async function run(label){
  const browser=await chromium.launch({channel:'chrome',headless:true}),c=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true}),p=await c.newPage(),cdp=await c.newCDPSession(p);
  try{
- await p.addInitScript(save=>{localStorage.setItem('two-seconds-after-you.arcana.v3',save);let Renderer;Object.defineProperty(window,'EchoRenderer',{get(){return Renderer;},set(R){Renderer=class extends R{game(g,m,...args){window.__perfView={g,m,r:this};const t=performance.now();super.game(g,m,...args);if(window.__perf)window.__perf.draw.push(performance.now()-t);}};}});},fs.readFileSync(path.join(dir,'chrome-completed-save.json'),'utf8'));
- await p.goto('http://127.0.0.1:4173');await p.evaluate(()=>document.fonts.ready);await p.locator('#titleLevels').tap();await p.locator('#levelItems button').nth(4).tap();await p.waitForTimeout(1000);
+ await p.addInitScript(save=>{localStorage.setItem('two-seconds-after-you.arcana.v4',save);let Renderer;Object.defineProperty(window,'EchoRenderer',{get(){return Renderer;},set(R){Renderer=class extends R{game(g,m,...args){window.__perfView={g,m,r:this};const t=performance.now();super.game(g,m,...args);if(window.__perf)window.__perf.draw.push(performance.now()-t);}};}});},fs.readFileSync(path.join(dir,'chrome-completed-save.json'),'utf8'));
+ await p.goto('http://127.0.0.1:4173');await p.evaluate(()=>document.fonts.ready);await p.locator('#titleLevels').tap();await p.locator('#levelItems button').nth(chapter).tap();await p.waitForTimeout(1000);
  await cdp.send('Performance.enable');await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
  const before=await cdp.send('Performance.getMetrics');
  await p.evaluate(()=>{window.__perf={draw:[],raf:[],gradients:0,rects:0};const proto=CanvasRenderingContext2D.prototype,off=typeof OffscreenCanvasRenderingContext2D==='undefined'?null:OffscreenCanvasRenderingContext2D.prototype;
@@ -20,4 +22,4 @@ async function run(label){
  await p.screenshot({path:path.join(dir,'performance-'+label+'.png')});console.log(JSON.stringify({label,...result}));return result;
  }finally{await browser.close();}
 }
-(async()=>{const current=await run('puzzle-v3');fs.writeFileSync(path.join(dir,'performance-puzzle-v3.json'),JSON.stringify(current,null,2));})().catch(e=>{console.error(e);process.exitCode=1;});
+(async()=>{const current=await run(label);fs.writeFileSync(path.join(dir,'performance-'+label+'.json'),JSON.stringify(current,null,2));})().catch(e=>{console.error(e);process.exitCode=1;});

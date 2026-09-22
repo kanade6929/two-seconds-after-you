@@ -8,17 +8,14 @@ async function run(channel){
  await advance(8);assert.equal((await state()).t,before);await button('resume');assert.ok((await state()).t>before);
  for(let i=0;i<8;i++){
   assert.equal((await state()).index,i);await advance(.5);await shot('game-'+i);
-  if(i===0){await d.tap(R.LEVELS[0].exit);assert.equal((await state()).won,false);await pin(R.LEVELS[0].seal);await move(R.LEVELS[0].exit,10);await shot('clickable');await click();}
-  if(i===1){const m=R.magicLayout();await d.tap(m.mirrors[0]);await d.tap(m.mirrors[1]);await pin(m.source);await move(m.receiver,10);await shot('light-path');await click();}
-  if(i===2){
-   await pin({x:780,y:280});await move({x:440,y:370},10);assert.equal((await state()).view.nodes[0].active,true);assert.equal((await state()).won,false);
-   await shot('lovers-four-lights');await move({x:420,y:440});assert.equal((await state()).won,true);
-  }
-  if(i===3){for(const[a,b]of[[0,1],[1,2],[2,0],[1,2],[0,1],[1,2],[2,0]]){if((await state()).memory)await button('release');await pin(R.cups[a]);await move(R.cups[b],4);await click();}}
-  if(i===4){await pin(R.starVertices[0]);for(const n of[1,2,3,1,4,3,0,4]){await move(R.starVertices[n],4);await click();}}
-  if(i===5){await shot('moon-remember');await pin(R.moonWell);await move(R.moonOptions[0],10);await click();assert.equal((await state()).won,false);await advance(3);await move(R.moonOptions[1]);await shot('moon-hidden');await click();}
-  if(i===6){await pin(R.sunSource);await d.tap(R.sunKeys[0]);await shot('sun-links');await d.tap(R.sunKeys[1]);}
-  if(i===7){for(const[a,b]of[[0,1],[3,2]]){if((await state()).memory)await button('release');await pin(R.worldVertices[a]);await d.tap(R.worldVertices[b]);await shot('world-linked');await d.tap(R.worldVertices[b]);}}
+  if(i===0){await move(R.LEVELS[0].seal,3.2);await move(R.LEVELS[0].exit,1.3);await shot('realtime-door');await click();}
+  if(i===1){const m=R.magicLayout();await d.tap(m.mirrors[0]);await d.tap(m.mirrors[1]);await move(m.source,3.2);await move(m.receiver,1.4);await shot('realtime-magic');await click();}
+  if(i===2){await move(R.mirrorPoint(R.loversSeals[0]),3.2);await move(R.mirrorPoint(R.loversSeals[1]),1.25);await shot('realtime-lovers');await advance(.7);}
+  if(i===3){await move(R.spring,.1);for(let t=0;t<80&&(await state()).view.water.forecast<55;t++)await advance(.05);await shot('realtime-temperance');await move(R.rest,5);}
+  if(i===4){await move(R.starLeft[2],3.2);await move(R.starRight[0],1.1);await shot('realtime-star');await advance(.9);}
+  if(i===5){await shot('moon-remember');await move(R.moonWell,3.2);await move(R.moonOptions[1],1.1);await shot('moon-hidden');await click();}
+  if(i===6){await move(R.sunPads[1],3.2);await move(R.sunPads[2],1.1);await shot('realtime-sun');await advance(.9);}
+  if(i===7){for(let k=0;k<4;k++){await move(R.worldVertices[k],3.2);await move(R.worldVertices[(k+1)%4],1.8);if(k===0)await shot('realtime-world');}}
   assert.equal((await state()).won,true,R.LEVELS[i].title);await advance(1.3);
   console.log(channel+': '+R.LEVELS[i].title+' input-only solve passed');await button('next');
  }

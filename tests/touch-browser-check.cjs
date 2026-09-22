@@ -7,7 +7,7 @@ async function run(width,height){
  const browser=await chromium.launch({channel:'chrome',headless:true});try{
  const c=await browser.newContext({viewport:{width,height},isMobile:true,hasTouch:true,deviceScaleFactor:3}),p=await c.newPage(),cdp=await c.newCDPSession(p),errors=[];
  p.on('pageerror',e=>errors.push(e.message));await p.clock.install({time:new Date('2026-09-16T00:00:00Z')});await p.clock.pauseAt(new Date('2026-09-16T00:00:01Z'));
- await p.addInitScript(save=>{localStorage.setItem('two-seconds-after-you.arcana.v3',save);let Renderer;Object.defineProperty(window,'EchoRenderer',{get(){return Renderer;},set(R){Renderer=class extends R{game(g,m,...a){window.__touch={g,m,r:this};super.game(g,m,...a);}};}});},fs.readFileSync(path.join(dir,'chrome-completed-save.json'),'utf8'));
+ await p.addInitScript(save=>{localStorage.setItem('two-seconds-after-you.arcana.v4',save);let Renderer;Object.defineProperty(window,'EchoRenderer',{get(){return Renderer;},set(R){Renderer=class extends R{game(g,m,...a){window.__touch={g,m,r:this};super.game(g,m,...a);}};}});},fs.readFileSync(path.join(dir,'chrome-completed-save.json'),'utf8'));
  await p.goto('http://127.0.0.1:4173');await p.evaluate(()=>document.fonts.ready);const tick=s=>p.clock.runFor(Math.round(s*1000));await tick(.5);
  await p.locator('#titleLevels').tap();await tick(.4);await p.locator('#levelItems button').nth(1).tap();await tick(.7);
  const pad=p.locator('#touchPad');assert.equal(await p.locator('#touchControls button').count(),1);assert.equal(await p.locator('#touchConfirm').count(),0);

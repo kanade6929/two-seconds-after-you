@@ -50,12 +50,13 @@
       this.point=p;this.timeline.add(this.t,p);this.echo=this.timeline.at(this.t-DELAY);
       const before=click?this.snapshot():null,revision=this.revision;
       Rules.update(this,dt,click);
-      if(click&&this.revision!==revision){this.history.push(before);if(this.history.length>64)this.history.shift();}
+      if(this.index===1&&click&&this.revision!==revision){this.history.push(before);if(this.history.length>64)this.history.shift();}
     }
     checkpoint(){return Rules.checkpoint(this);}
     snapshot(){return {state:JSON.parse(JSON.stringify(this.state)),memory:this.memory&&{...this.memory},pending:this.pending&&{...this.pending,at:this.pending.at-this.t}};}
-    undo(){if(this.won)return false;const past=this.history.pop();if(!past)return false;this.state=past.state;this.memory=past.memory;this.pending=past.pending&&{...past.pending,at:this.t+past.pending.at};this.echo=this.memory?{...this.memory,down:false}:this.timeline.at(this.t-DELAY);this.state.error=0;this.revision++;this.progressAt=this.t;this.view=Rules.view(this);this.ready=this.open=this.view.clickable;return true;}
-    release(){if(!this.memory&&!this.pending)return false;this.history.push(this.snapshot());if(this.history.length>64)this.history.shift();this.memory=this.pending=null;this.echo=this.timeline.at(this.t-DELAY);this.state.error=0;this.revision++;this.progressAt=this.t;this.view=Rules.view(this);this.ready=this.open=this.view.clickable;return true;}
+    clearEcho(){this.memory=this.pending=this.echo=null;this.timeline=new Timeline();this.timeline.add(this.t,this.point);this.timers={};this.contacts={};this.hold=0;this.effect={};this.state.pourSamples=[];this.view=Rules.view(this);this.ready=this.open=false;}
+    undo(){if(this.won||this.index!==1)return false;const past=this.history.pop();if(!past)return false;this.state=past.state;this.state.error=0;this.clearEcho();this.revision++;this.progressAt=this.t;return true;}
+    release(){if(this.won)return false;this.clearEcho();if(this.index===3)this.state.water=0;this.state.error=0;this.revision++;this.progressAt=this.t;this.view=Rules.view(this);return true;}
     status(){return this.view.message;}
   }
   const api={STEP,DELAY,HOLD,WIDTH,HEIGHT,MAX_SPEED,MAX_ACCEL,LEVELS,Rules,distance,segmentDistance,Timeline,Follower,TouchGesture,Game,readProgress};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.EchoCore=api;

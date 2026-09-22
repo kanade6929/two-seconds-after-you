@@ -75,7 +75,7 @@ test('click reminder follows live permission, never afterglow or a paused scene'
   const {driver}=require('./routes.cjs'),d=driver(0),g=d.g,{r}=renderer(),calls=[];
   r.clickCue=(...args)=>calls.push(args);
   r.game(g,'play',false);assert.equal(calls.length,0);
-  d.pin(g.level.seal);d.move(g.level.exit,10);
+  d.move(g.level.seal,3.2);d.move(g.level.exit,1.3);
   r.game(g,'play',false);assert.equal(calls.length,1);assert.equal(calls[0][1],'点击抵达');
   r.game(g,'pause',false);assert.equal(calls.length,1);
   d.release();assert.equal(g.view.clickable,false);
@@ -134,15 +134,16 @@ test('lovers reflections render above opaque mechanisms, with two distinct mirro
  assert.notEqual(draws.at(-1).color,draws.at(-2).color);
 });
 
-test('changed light paths and sun windows fade independently, without delaying logical state',()=>{
- const {driver}=require('./routes.cjs'),d=driver(6),{r}=renderer();d.pin(Core.Rules.sunSource);for(let i=0;i<20;i++)r.game(d.g,'play',false,1/120);
- assert.ok(r.windowLights[0]>.9);d.tap(Core.Rules.sunKeys[0]);r.game(d.g,'play',false,1/120);assert.equal(d.g.view.lightWindows[0].on,false);assert.ok(r.windowLights[0]>.5);
- const old=[...r.beamLights.values()][0];d.release();r.game(d.g,'play',false,1/120);assert.ok(old.light>0);for(let i=0;i<100;i++)r.game(d.g,'play',false,1/120);assert.ok([...r.beamLights.values()].every(b=>b.light>.9));
+test('static beam paths fade but moving chords never accumulate cached afterimages',()=>{
+ const {driver}=require('./routes.cjs'),d=driver(1),{r}=renderer();d.move(Core.Rules.magicLayout().source,3.2);for(let i=0;i<20;i++)r.game(d.g,'play',false,1/120);
+ const old=[...r.beamLights.values()][0];assert.ok(old.light>.9);d.release();r.game(d.g,'play',false,1/120);assert.ok(old.light>0);
+ const star=driver(4);star.move(Core.Rules.starLeft[2],3.2);for(let i=0;i<120;i++){star.move(Core.Rules.starRight[0],1/120);r.game(star.g,'play',false,1/120);}assert.equal(r.beamLights.size,0);
 });
-
-test('small-screen action captions do not overprint memory guidance or water amounts',()=>{
+test('small-screen action captions do not overprint memory guidance or balance slots',()=>{
  const {driver}=require('./routes.cjs'),d=driver(5),{r}=renderer();r.mobile=true;r.scale=.35;const labels=[];r.text=(text,x,y)=>labels.push({text,x,y});
- d.pin(Core.Rules.moonWell);for(const p of Core.Rules.moonOptions){d.move(p,3);labels.length=0;r.game(d.g,'play',false);assert.equal(labels.filter(l=>l.text==='确认倒影').length,1);assert.equal(labels.filter(l=>l.text==='凭记忆辨认').length,0);}
- const cups=driver(3);cups.pin(Core.Rules.cups[0]);cups.move(Core.Rules.cups[1],3);labels.length=0;r.game(cups.g,'play',false);
- const action=labels.find(l=>l.text==='倒入此杯'),amount=labels.find(l=>l.text==='0'&&l.x===600);assert.ok((amount.y-action.y)*r.scale>=15.99);
+ d.pin(Core.Rules.moonWell);for(const p of Core.Rules.moonOptions){d.move(Core.Rules.moonWell,3.2);d.move(p,1.1);labels.length=0;r.game(d.g,'play',false);assert.equal(labels.filter(l=>l.text==='确认倒影').length,1);assert.equal(labels.filter(l=>l.text==='凭记忆辨认').length,0);}
+ const water=driver(3);water.move(Core.Rules.spring,2);labels.length=0;r.game(water.g,'play',false);assert.ok(labels.some(l=>l.text.includes('预测')));
+});
+test('water forecast renders without changing realtime rule state in reduced motion',()=>{
+ const {driver}=require('./routes.cjs'),d=driver(3),{r}=renderer();d.move(Core.Rules.spring,2);const before=JSON.stringify(d.g.checkpoint());r.game(d.g,'play',false);r.game(d.g,'play',true);assert.equal(JSON.stringify(d.g.checkpoint()),before);
 });
